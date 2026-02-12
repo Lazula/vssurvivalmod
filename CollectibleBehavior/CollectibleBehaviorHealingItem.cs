@@ -45,6 +45,8 @@ public class CollectibleBehaviorHealingItem : CollectibleBehavior, ICanHealCreat
 
     protected float secondsUsedToCancel = 0;
 
+    private float secondsUsedWhenCanceledByPlayer = 0;
+
     public CollectibleBehaviorHealingItem(CollectibleObject collectable) : base(collectable) { }
 
     public override void Initialize(JsonObject properties)
@@ -113,7 +115,7 @@ public class CollectibleBehaviorHealingItem : CollectibleBehavior, ICanHealCreat
 
         handling = EnumHandling.Handled;
 
-        float progress = secondsUsed / (GetApplicationTime(byEntity)); // + (byEntity.World.Side == EnumAppSide.Client ? 0.3f : 0) - i am not sure for what purpose, we already make sure XXXStop() gets called server side. And it causes github bug #6719
+        float progress = secondsUsed / (GetApplicationTime(byEntity));
         if (progressBarRender != null)
         {
             progressBarRender.Progress = progress;
@@ -125,6 +127,7 @@ public class CollectibleBehaviorHealingItem : CollectibleBehavior, ICanHealCreat
     {
         applicationSound?.Stop();
         api?.ModLoader.GetModSystem<ModSystemProgressBar>()?.RemoveProgressbar(progressBarRender);
+        secondsUsedWhenCanceledByPlayer = secondsUsed;
         return base.OnHeldInteractCancel(secondsUsed, slot, byEntity, blockSel, entitySel, cancelReason, ref handled);
     }
 
@@ -135,10 +138,24 @@ public class CollectibleBehaviorHealingItem : CollectibleBehavior, ICanHealCreat
 
         handling = EnumHandling.Handled;
 
-        if (secondsUsed < GetApplicationTime(byEntity) || byEntity.World.Side != EnumAppSide.Server)
+        // Items continue stepping client-side until Stop
+        // is called, so secondsUsed will actually be
+        // higher then it should be if we were stopped
+        // by Cancel.
+        //
+        // Caused #7915
+        if (secondsUsedWhenCanceledByPlayer < GetApplicationTime(byEntity))
         {
             return;
         }
+
+        if (secondsUsed < GetApplicationTime(byEntity) || byEntity.World.Side != EnumAppSide.Server)
+        {
+            Console.WriteLine($"cant continue; stopped at {secondsUsed} seconds used (vs {GetApplicationTime(byEntity)} application time)");
+            return;
+        }
+
+        Console.WriteLine($"continuing; stopped at {secondsUsed} seconds used (vs {GetApplicationTime(byEntity)} application time)");
 
         Entity targetEntity = GetTargetEntity(slot, byEntity, entitySel);
 

@@ -62,7 +62,11 @@ namespace Vintagestory.GameContent
 
         public ItemStack TryPlaceOn(ItemStack stack, BlockEntityAnvil beAnvil)
         {
-            if (!CanWork(stack)) return null;
+            if (!CanWork(stack))
+            {
+                (api as ICoreClientAPI)?.TriggerIngameError(this, "toocold", Lang.Get("Too cold to work"));
+                return null;
+            }
 
             ItemStack workItemStack = new ItemStack(api.World.GetItem(new AssetLocation("workitem-" + Variant["metal"])));
             workItemStack.Collectible.SetTemperature(api.World, workItemStack, stack.Collectible.GetTemperature(api.World, stack));
@@ -75,9 +79,8 @@ namespace Vintagestory.GameContent
             {
                 if (!string.Equals(beAnvil.WorkItemStack.Collectible.Variant["metal"], stack.Collectible.Variant["metal"]))
                 {
-                    if (api.Side == EnumAppSide.Client)
-                        (api as ICoreClientAPI).TriggerIngameError(this, "notequal",
-                            Lang.Get("Must be the same metal to add voxels"));
+                    (api as ICoreClientAPI)?.TriggerIngameError(this, "notequal",
+                        Lang.Get("Must be the same metal to add voxels"));
                     return null;
                 }
 

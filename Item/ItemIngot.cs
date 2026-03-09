@@ -69,7 +69,11 @@ namespace Vintagestory.GameContent
 
         public ItemStack TryPlaceOn(ItemStack stack, BlockEntityAnvil beAnvil)
         {
-            if (!CanWork(stack)) return null;
+            if (!CanWork(stack))
+            {
+                (api as ICoreClientAPI)?.TriggerIngameError(this, "toocold", Lang.Get("Too cold to work"));
+                return null;
+            }
 
             Item item = api.World.GetItem(new AssetLocation("workitem-" + Variant["metal"]));
             if (item == null) return null;
@@ -80,10 +84,11 @@ namespace Vintagestory.GameContent
             if (beAnvil.WorkItemStack == null)
             {
                 CreateVoxelsFromIngot(api, ref beAnvil.Voxels, isBlisterSteel);
-            } else
+            }
+            else
             {
                 if (isBlisterSteel) return null;
-                
+
                 if (!string.Equals(beAnvil.WorkItemStack.Collectible.Variant["metal"], stack.Collectible.Variant["metal"]))
                 {
                     if (api.Side == EnumAppSide.Client) (api as ICoreClientAPI).TriggerIngameError(this, "notequal", Lang.Get("Must be the same metal to add voxels"));

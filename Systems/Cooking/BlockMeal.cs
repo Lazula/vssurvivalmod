@@ -587,10 +587,10 @@ namespace Vintagestory.GameContent
 
                 float spoilState = 0;
                 DummySlot slot = new DummySlot(contentStack, inSlot.Inventory);
-                if (!timeFrozen)
+                // Pie contents do not transition
+                if (!timeFrozen && inSlot.Itemstack.Block is not BlockPie)
                 {
-                    TransitionState? state = contentStack.Collectible.UpdateAndGetTransitionState(world, slot, EnumTransitionType.Perish);
-                    spoilState = state != null ? state.TransitionLevel : 0;
+                    spoilState = contentStack.Collectible.UpdateAndGetTransitionState(world, slot, EnumTransitionType.Perish)?.TransitionLevel ?? 0;
                 }
 
                 float satLossMul = GlobalConstants.FoodSpoilageSatLossMul(spoilState, mealStack, forEntity);

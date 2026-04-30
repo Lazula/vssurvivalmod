@@ -183,7 +183,7 @@ namespace Vintagestory.GameContent
             //    for item.NutritionProps.FoodCategory == Protein   => block/food/pie/fill-mixedmeat.png
             //    for item.NutritionProps.FoodCategory == Fruit   => block/food/pie/fill-mixedfruit.png
 
-            var stackprops = contentStacks.Select(stack => stack?.ItemAttributes?["inPieProperties"]?.AsObject<InPieProperties?>(null, stack.Collectible.Code.Domain)).ToArray();
+            var stackprops = contentStacks.Select(InPieProperties.ReadFrom).ToArray();
 
             int bakeLevel = pieStack?.Attributes.GetAsInt("bakeLevel", 0) ?? 0;
 

@@ -25,6 +25,16 @@ namespace Vintagestory.GameContent
         public required AssetLocation Texture;
         public EnumFoodCategory? FoodCategory;
         public string[] MixingCodes = [];
+
+        public static InPieProperties? ReadFrom(CollectibleObject? obj)
+        {
+            return obj?.Attributes?["inPieProperties"]?.AsObject<InPieProperties?>(null, obj.Code.Domain);
+        }
+
+        public static InPieProperties? ReadFrom(ItemStack? stack)
+        {
+            return ReadFrom(stack?.Collectible);
+        }
     }
 
     // Idea:
@@ -272,14 +282,15 @@ namespace Vintagestory.GameContent
             errMessage = null;
             emptySlotIndex = -1;
 
-            if (stack?.ItemAttributes["inPieProperties"].AsObject<InPieProperties>(null, stack.Collectible.Code.Domain) is not { } pieProps)
+            if (InPieProperties.ReadFrom(stack) is not InPieProperties pieProps)
             {
                 errCode = "notpieable";
                 errMessage = Lang.Get("This item can not be added to pies");
                 return false;
             }
 
-            if (stack.StackSize < 2)
+            // Not null if pieProps exists
+            if (stack!.StackSize < 2)
             {
                 errCode = "notpieable";
                 errMessage = Lang.Get("Need at least 2 items each");
@@ -319,7 +330,7 @@ namespace Vintagestory.GameContent
             }
 
             var foodCats = cStacks.Select(BlockPie.FillingFoodCategory).ToArray();
-            var stackprops = cStacks.Select(stack => stack?.ItemAttributes?["inPieProperties"]?.AsObject<InPieProperties?>(null, stack.Collectible.Code.Domain)).ToArray();
+            var stackprops = cStacks.Select(InPieProperties.ReadFrom).ToArray();
 
             EnumFoodCategory foodCat = BlockPie.FillingFoodCategory(stack);
 

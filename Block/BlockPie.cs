@@ -78,7 +78,7 @@ namespace Vintagestory.GameContent
                             doughStacks.Add(new ItemStack(obj, 2));
                         }
 
-                        if (obj.Attributes?["inPieProperties"].AsObject<InPieProperties?>(null, obj.Code.Domain)?.PartType == EnumPiePartType.Filling)
+                        if (InPieProperties.ReadFrom(obj)?.PartType == EnumPiePartType.Filling)
                         {
                             fillStacks.Add(new ItemStack(obj, 2));
                         }
@@ -234,8 +234,7 @@ namespace Vintagestory.GameContent
             IPlayer? byPlayer = (byEntity as EntityPlayer)?.Player;
             ItemSlot? hotbarSlot = byPlayer?.InventoryManager.ActiveHotbarSlot;
 
-            var pieprops = hotbarSlot?.Itemstack?.ItemAttributes["inPieProperties"]?.AsObject<InPieProperties>();
-            if (pieprops?.PartType != EnumPiePartType.Crust) return;
+            if (InPieProperties.ReadFrom(hotbarSlot?.Itemstack)?.PartType != EnumPiePartType.Crust) return;
 
             BlockPos abovePos = blockSel.Position.UpCopy();
 
@@ -269,14 +268,14 @@ namespace Vintagestory.GameContent
 
             bool singleIngredient = true;
             bool singleFoodCat = true;
-            IEnumerable<string> mixCodes = cstack.ItemAttributes["inPieProperties"].AsObject<InPieProperties>()?.MixingCodes ?? [];
+            IEnumerable<string> mixCodes = InPieProperties.ReadFrom(cstack)?.MixingCodes ?? [];
             for (int i = 2; (singleIngredient || singleFoodCat || mixCodes.Any()) && i < cStacks.Length - 1; i++)
             {
                 if (cStacks[i] == null) continue;
 
                 singleIngredient &= cstack.Equals(api.World, cStacks[i], GlobalConstants.IgnoredStackAttributes);
                 singleFoodCat &= cStacks[i] == null || foodCats[i] == foodCat;
-                mixCodes = cstack.ItemAttributes["inPieProperties"].AsObject<InPieProperties>()?.MixingCodes.Intersect(mixCodes) ?? [];
+                mixCodes = InPieProperties.ReadFrom(cstack)?.MixingCodes.Intersect(mixCodes) ?? [];
 
                 cstack = cStacks[i];
                 foodCat = foodCats[i];
@@ -305,7 +304,7 @@ namespace Vintagestory.GameContent
         public static EnumFoodCategory FillingFoodCategory(ItemStack? stack)
         {
             if (stack == null) return EnumFoodCategory.Vegetable;
-            EnumFoodCategory? category = stack.ItemAttributes["inPieProperties"].AsObject<InPieProperties>()?.FoodCategory;
+            EnumFoodCategory? category = InPieProperties.ReadFrom(stack)?.FoodCategory;
 
             if (category == null)
             {
@@ -519,7 +518,7 @@ namespace Vintagestory.GameContent
 
             foreach (var stack in allStacks)
             {
-                var pieProps = stack.ItemAttributes?["inPieProperties"]?.AsObject<InPieProperties>();
+                var pieProps = InPieProperties.ReadFrom(stack);
 
                 if (pieProps?.PartType == EnumPiePartType.Crust) doughs.Add(stack);
                 if (pieProps is { PartType: EnumPiePartType.Filling, AllowMixing: true })
@@ -706,7 +705,7 @@ namespace Vintagestory.GameContent
                         int noOtherMixingCodesInCategory = filteredValidStacks
                             .Where(stack =>
                             {
-                                if (stack?.ItemAttributes["inPieProperties"].AsObject<InPieProperties>() is not { } props) return true;
+                                if (InPieProperties.ReadFrom(stack) is not { } props) return true;
                                 return props.FoodCategory == cat && props.MixingCodes.Except([pieMixCode[1]]).Count() == 0;
                             })
                             .Count();
@@ -716,7 +715,7 @@ namespace Vintagestory.GameContent
                             // We can filter out non-matching mixing codes because we have at least one left for this category.
                             filteredValidStacks = filteredValidStacks.Where(stack =>
                             {
-                                if (stack?.ItemAttributes["inPieProperties"].AsObject<InPieProperties>() is not { } props) return true;
+                                if (InPieProperties.ReadFrom(stack) is not { } props) return true;
                                 return props.FoodCategory != cat || props.MixingCodes.Except([pieMixCode[1]]).Count() == 0;
                             }).ToList();
                         }
@@ -831,7 +830,7 @@ namespace Vintagestory.GameContent
 
             if (GetContents(world, stack) is ItemStack[] contents && contents.Length > 1)
             {
-                if (contents[1]?.ItemAttributes?["inPieProperties"]?.AsObject<InPieProperties>()?.AllowMixing == false)
+                if (InPieProperties.ReadFrom(contents[1])?.AllowMixing == false)
                 {
                     type = "single-" + contents[1].Collectible.Code.ToShortString();
                 }

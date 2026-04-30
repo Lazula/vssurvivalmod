@@ -292,7 +292,7 @@ namespace Vintagestory.GameContent
             // Not null if pieProps exists
             if (stack!.StackSize < 2)
             {
-                errCode = "notpieable";
+                errCode = "notenoughingredients";
                 errMessage = Lang.Get("Need at least 2 items each");
                 return false;
             }
@@ -361,13 +361,13 @@ namespace Vintagestory.GameContent
 
             if (!foodCatEquals && !mixCodes.Any())
             {
-                errCode = "piefullfilling";
+                errCode = "piemismatchedmix";
                 errMessage = Lang.Get("piemaking-unabletomixingredient");
                 return false;
             }
             else if (!allowMixing)
             {
-                errCode = "piefullfilling";
+                errCode = "pienonmixable";
                 errMessage = Lang.Get("piemaking-mixingnotallowed");
                 return false;
             }

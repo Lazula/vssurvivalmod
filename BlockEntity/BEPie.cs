@@ -182,11 +182,11 @@ namespace Vintagestory.GameContent
 
             ItemSlot? hotbarSlot = byPlayer.InventoryManager.ActiveHotbarSlot;
 
-            if (hotbarSlot?.Itemstack?.Collectible.GetTool(hotbarSlot) is { } tool && tool is EnumTool.Knife or EnumTool.Sword)
+            if (hotbarSlot?.Itemstack?.Collectible.GetTool(hotbarSlot) is EnumTool tool && (tool is EnumTool.Knife || tool is EnumTool.Sword))
             {
                 if (pieBlock.State != "raw")
                 {
-                    if (Api.Side == EnumAppSide.Server && TakeSlice() is { } slicestack)
+                    if (Api.Side == EnumAppSide.Server && TakeSlice() is ItemStack slicestack)
                     {
                         hotbarSlot.Itemstack.Collectible.DamageItem(byPlayer.Entity.World, byPlayer.Entity, hotbarSlot);
                         if (!byPlayer.InventoryManager.TryGiveItemstack(slicestack))
@@ -276,13 +276,13 @@ namespace Vintagestory.GameContent
             return CanAddIngredient(stack, out _, out _, out _);
         }
 
-        public bool CanAddIngredient(ItemStack? stack, out int emptySlotIndex, out string? errCode, out string? errMessage)
+        public bool CanAddIngredient(ItemStack? prevStack, out int emptySlotIndex, out string? errCode, out string? errMessage)
         {
             errCode = null;
             errMessage = null;
             emptySlotIndex = -1;
 
-            if (InPieProperties.ReadFrom(stack) is not InPieProperties pieProps)
+            if (InPieProperties.ReadFrom(prevStack) is not InPieProperties pieProps)
             {
                 errCode = "notpieable";
                 errMessage = Lang.Get("This item can not be added to pies");
@@ -290,7 +290,7 @@ namespace Vintagestory.GameContent
             }
 
             // Not null if pieProps exists
-            if (stack!.StackSize < 2)
+            if (prevStack!.StackSize < 2)
             {
                 errCode = "notenoughingredients";
                 errMessage = Lang.Get("Need at least 2 items each");
@@ -329,37 +329,39 @@ namespace Vintagestory.GameContent
                 return true;
             }
 
-            var foodCats = cStacks.Select(BlockPie.FillingFoodCategory).ToArray();
-            var stackprops = cStacks.Select(InPieProperties.ReadFrom).ToArray();
+            EnumFoodCategory[] foodCats = cStacks.Select(BlockPie.FillingFoodCategory).ToArray();
+            InPieProperties?[] stackprops = cStacks.Select(InPieProperties.ReadFrom).ToArray();
 
-            EnumFoodCategory foodCat = BlockPie.FillingFoodCategory(stack);
+            EnumFoodCategory prevFoodCat = BlockPie.FillingFoodCategory(prevStack);
 
-            bool equal = true;
-            bool foodCatEquals = true;
+            bool singleIngredient = true;
+            bool singleFoodCat = true;
             bool allowMixing = true;
             IEnumerable<string> mixCodes = pieProps.MixingCodes;
 
-            for (int i = 1; (equal || foodCatEquals || mixCodes.Any()) && i < cStacks.Length - 1; i++)
+            for (int i = 1; (singleIngredient || singleFoodCat || mixCodes.Any()) && i < cStacks.Length - 1; i++)
             {
-                if (stack == null) continue;
+                if (prevStack == null) continue;
 
-                equal &= cStacks[i] == null || stack.Equals(Api.World, cStacks[i], GlobalConstants.IgnoredStackAttributes);
-                foodCatEquals &= cStacks[i] == null || foodCats[i] == foodCat;
-                allowMixing &= stackprops[i]?.AllowMixing != false;
+                singleIngredient &= cStacks[i] == null || prevStack.Equals(Api.World, cStacks[i], GlobalConstants.IgnoredStackAttributes);
+                singleFoodCat &= cStacks[i] == null || foodCats[i] == prevFoodCat;
+                allowMixing &= stackprops[i]?.AllowMixing == true;
                 mixCodes = stackprops[i]?.MixingCodes.Intersect(mixCodes) ?? mixCodes;
 
-                stack = cStacks[i];
-                foodCat = foodCats[i];
+                if (!singleIngredient && !singleFoodCat && !mixCodes.Any()) break;
+
+                prevStack = cStacks[i];
+                prevFoodCat = foodCats[i];
             }
 
             emptySlotIndex = 2 + (cStacks[2] != null ? 1 + (cStacks[3] != null ? 1 : 0) : 0);
 
-            if (equal)
+            if (singleIngredient)
             {
                 return true;
             }
 
-            if (!foodCatEquals && !mixCodes.Any())
+            if (!singleFoodCat && !mixCodes.Any())
             {
                 errCode = "piemismatchedmix";
                 errMessage = Lang.Get("piemaking-unabletomixingredient");

@@ -15,20 +15,69 @@ namespace Vintagestory.GameContent
     {
         Crust, Filling, Topping
     }
+
     public class InPieProperties
     {
         /// <summary>
-        /// If true, allows mixing of the same nutritionprops food category
+        /// Is this ingredient allowed to mix with other ingredients?
+        ///
+        /// If false, MixingCodes has no effect.
         /// </summary>
         public bool AllowMixing = true;
+
+        /// <summary>
+        /// Is this a crust, filling, or topping?
+        /// </summary>
         public EnumPiePartType PartType;
+
         public required AssetLocation Texture;
-        public EnumFoodCategory? FoodCategory;
+
+        /// <summary>
+        /// The food category of the ingredient when used in a pie.
+        ///
+        /// Checks in order, stopping once a value is found:
+        ///   1. If stack is null, default to vegetable
+        ///   2. InPieProperties.FoodCategory
+        ///   3. If stack has ContainableProps:
+        ///     3a. NutritionPropsPerLitreWhenInMeal.FoodCategory
+        ///     3b. NutritionPropsPerLitre.FoodCategory
+        ///   4. If stack has NutritionProps:
+        ///     4a. NutritionPropsWhenInMeal.FoodCategory
+        ///     4b. NutritionProps.FoodCategory
+        ///   5. Default to vegetable
+        ///
+        /// Note that the field default isn't actually used because we
+        /// null-coalesce from our checks in ReadFrom, so if you want to
+        /// change it, you need to do it there.
+        /// </summary>
+        public EnumFoodCategory FoodCategory = EnumFoodCategory.Vegetable;
+
+        /// <summary>
+        /// A list of mixing codes that are allowed for this ingredient.
+        /// </summary>
         public string[] MixingCodes = [];
 
         public static InPieProperties? ReadFrom(CollectibleObject? obj)
         {
-            return obj?.Attributes?["inPieProperties"]?.AsObject<InPieProperties?>(null, obj.Code.Domain);
+            if (obj?.Attributes?["inPieProperties"]?.AsObject<InPieProperties>(null, obj.Code.Domain) is not InPieProperties props) return null;
+
+            // This will always override the default for FoodCategory.
+            {
+                EnumFoodCategory? foodCat = null;
+
+                if (BlockLiquidContainerBase.GetContainableProps(obj) is WaterTightContainableProps liquidProps)
+                {
+                    foodCat = liquidProps.NutritionPropsPerLitreWhenInMeal?.FoodCategory;
+                    foodCat ??= liquidProps.NutritionPropsPerLitre?.FoodCategory;
+                }
+
+                foodCat ??= obj?.Attributes?["nutritionPropsWhenInMeal"]?.AsObject<FoodNutritionProperties>()?.FoodCategory;
+                foodCat ??= obj?.GetNutritionProperties(null, null, null)?.FoodCategory;
+
+                props.FoodCategory = foodCat ?? EnumFoodCategory.Vegetable;
+            }
+
+            return props;
         }
 
         public static InPieProperties? ReadFrom(ItemStack? stack)
@@ -329,10 +378,10 @@ namespace Vintagestory.GameContent
                 return true;
             }
 
-            EnumFoodCategory[] foodCats = cStacks.Select(BlockPie.FillingFoodCategory).ToArray();
+            EnumFoodCategory[] foodCats = cStacks.Select(BlockPie.IngredientFoodCategory).ToArray();
             InPieProperties?[] stackprops = cStacks.Select(InPieProperties.ReadFrom).ToArray();
 
-            EnumFoodCategory prevFoodCat = BlockPie.FillingFoodCategory(prevStack);
+            EnumFoodCategory prevFoodCat = BlockPie.IngredientFoodCategory(prevStack);
 
             bool singleIngredient = true;
             bool singleFoodCat = true;

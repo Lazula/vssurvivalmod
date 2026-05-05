@@ -273,7 +273,7 @@ namespace Vintagestory.GameContent
             if (cStacks.Length <= 1) return Lang.Get("pie-empty");
 
             ItemStack prevStack = cStacks[1];
-            EnumFoodCategory[] foodCats = cStacks.Select(FillingFoodCategory).ToArray();
+            EnumFoodCategory[] foodCats = cStacks.Select(IngredientFoodCategory).ToArray();
             EnumFoodCategory prevFoodCat = foodCats[1];
 
             if (prevStack == null) return Lang.Get("pie-empty");
@@ -312,25 +312,36 @@ namespace Vintagestory.GameContent
                 return Lang.Get("pie-mixed-" + mixCodes.First() + "-" + state);
             }
 
-            return Lang.Get("pie-mixed-" + FillingFoodCategory(cStacks[1]).ToString().ToLowerInvariant() + "-" + state);
+            return Lang.Get("pie-mixed-" + IngredientFoodCategory(cStacks[1]).ToString().ToLowerInvariant() + "-" + state);
         }
 
-        public static EnumFoodCategory FillingFoodCategory(ItemStack? stack)
+        /// <summary>
+        /// The food category of the ingredient when used in a pie.
+        ///
+        /// Checks in order, stopping once a value is found:
+        ///   1. If stack is null, default to vegetable
+        ///   2. InPieProperties.FoodCategory
+        ///   3. If stack has ContainableProps:
+        ///     3a. NutritionPropsPerLitreWhenInMeal.FoodCategory
+        ///     3b. NutritionPropsPerLitre.FoodCategory
+        ///   4. If stack has NutritionProps:
+        ///     4a. NutritionPropsWhenInMeal.FoodCategory
+        ///     4b. NutritionProps.FoodCategory
+        ///   5. Default to vegetable
+        /// </summary>
+        public static EnumFoodCategory IngredientFoodCategory(ItemStack? stack)
         {
             if (stack == null) return EnumFoodCategory.Vegetable;
             EnumFoodCategory? category = InPieProperties.ReadFrom(stack)?.FoodCategory;
 
-            if (category == null)
+            if (category == null && BlockLiquidContainerBase.GetContainableProps(stack) is WaterTightContainableProps liquidProps)
             {
-                var liquidProps = BlockLiquidContainerBase.GetContainableProps(stack);
-                if (liquidProps != null)
-                {
-                    category = liquidProps.NutritionPropsPerLitreWhenInMeal?.FoodCategory
-                            ?? liquidProps.NutritionPropsPerLitre?.FoodCategory;
-                }
+                category ??= liquidProps.NutritionPropsPerLitreWhenInMeal?.FoodCategory;
+                category ??= liquidProps.NutritionPropsPerLitre?.FoodCategory;
             }
-            category ??= stack.ItemAttributes?["nutritionPropsWhenInMeal"]?.AsObject<FoodNutritionProperties>()?.FoodCategory
-                      ?? stack.Collectible.GetNutritionProperties(null, stack, null)?.FoodCategory;
+
+            category ??= stack.ItemAttributes?["nutritionPropsWhenInMeal"]?.AsObject<FoodNutritionProperties>()?.FoodCategory;
+            category ??= stack.Collectible.GetNutritionProperties(null, stack, null)?.FoodCategory;
 
             return category ?? EnumFoodCategory.Vegetable;
         }
@@ -544,7 +555,7 @@ namespace Vintagestory.GameContent
                         else mixedFillings.Add(code, [stack]);
                     }
 
-                    var cat = FillingFoodCategory(stack);
+                    var cat = IngredientFoodCategory(stack);
                     if (cat is not EnumFoodCategory.NoNutrition and not EnumFoodCategory.Unknown)
                     {
                         if (categoryFillings.TryGetValue(cat, out var value)) value.Add(stack);
@@ -673,7 +684,7 @@ namespace Vintagestory.GameContent
                 {
                     if (validStacks.First(stack => stack?.Collectible.Code == ingredientStack?.Collectible.Code) is { } stack)
                     {
-                        if (FillingFoodCategory(stack) is EnumFoodCategory cat)
+                        if (IngredientFoodCategory(stack) is EnumFoodCategory cat)
                         {
                             includedFoodCategories.Add(cat);
                         }
@@ -692,7 +703,7 @@ namespace Vintagestory.GameContent
                 {
                     foreach (ItemStack? stack in validStacks)
                     {
-                        if (FillingFoodCategory(stack) is EnumFoodCategory cat && cat != EnumFoodCategory.NoNutrition)
+                        if (IngredientFoodCategory(stack) is EnumFoodCategory cat && cat != EnumFoodCategory.NoNutrition)
                         {
                             allFoodCategories.Add(cat);
                         }
@@ -744,13 +755,13 @@ namespace Vintagestory.GameContent
                     if (ingredient.Code == "filling" && (filteredValidStacks?.Count ?? 0) > 0)
                     {
                         ItemStack? newIngredient = filteredValidStacks![api.World.Rand.Next(filteredValidStacks!.Count)]?.Clone();
-                        if (FillingFoodCategory(newIngredient) is EnumFoodCategory newCategory)
+                        if (IngredientFoodCategory(newIngredient) is EnumFoodCategory newCategory)
                         {
                             includedFoodCategories.Add(newCategory);
 
                             bool filterStackIfCategoryIncluded(ItemStack? stack)
                             {
-                                if (FillingFoodCategory(stack) is EnumFoodCategory category)
+                                if (IngredientFoodCategory(stack) is EnumFoodCategory category)
                                 {
                                     return includedFoodCategories.Contains(category);
                                 }
@@ -849,7 +860,7 @@ namespace Vintagestory.GameContent
                 {
                     type = "single-" + contents[1].Collectible.Code.ToShortString();
                 }
-                else type = "mixed-" + FillingFoodCategory(contents[1]).ToString().ToLowerInvariant();
+                else type = "mixed-" + IngredientFoodCategory(contents[1]).ToString().ToLowerInvariant();
 
                 return "handbook-mealrecipe-" + type + "-pie";
             }

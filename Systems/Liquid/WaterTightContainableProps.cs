@@ -17,6 +17,9 @@ namespace Vintagestory.GameContent
         public float LiquidMaxYTranslate;
     }
 
+    /// <summary>
+    /// <!--<jsonalias>waterTightContainerProps</jsonalias>-->
+    /// </summary>
     public class WaterTightContainableProps
     {
         public bool Containable;

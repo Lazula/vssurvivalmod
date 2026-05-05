@@ -309,20 +309,14 @@ namespace Vintagestory.GameContent
         }
 
 
-
+        public static WaterTightContainableProps? GetContainableProps(CollectibleObject? obj)
+        {
+            return obj?.Attributes?["waterTightContainerProps"].AsObject<WaterTightContainableProps?>(null, obj.Code.Domain);
+        }
 
         public static WaterTightContainableProps? GetContainableProps(ItemStack? stack)
         {
-            try
-            {
-                JsonObject? obj = stack?.ItemAttributes?["waterTightContainerProps"];
-                if (obj != null && obj.Exists) return obj.AsObject<WaterTightContainableProps>(null, stack!.Collectible.Code.Domain);
-                return null;
-            }
-            catch (Exception)
-            {
-                return null;
-            }
+            return GetContainableProps(stack?.Collectible);
         }
 
         /// <summary>

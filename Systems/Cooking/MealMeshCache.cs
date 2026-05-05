@@ -191,7 +191,7 @@ namespace Vintagestory.GameContent
 
 
             ItemStack cstack = contentStacks[1];
-            var foodCats = contentStacks.Select(BlockPie.FillingFoodCategory).ToArray();
+            var foodCats = contentStacks.Select(BlockPie.IngredientFoodCategory).ToArray();
             EnumFoodCategory foodCat = foodCats[1];
 
             bool equal = true;

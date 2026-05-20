@@ -164,14 +164,14 @@ namespace Vintagestory.GameContent
         {
             ObjectCacheUtil.GetOrCreate(capi, "valstacksbying-" + recipe.Code, () =>
             {
-                Dictionary<CookingRecipeIngredient, HashSet<ItemStack>> valStacksByIng = [];
+                Dictionary<CookingRecipeIngredient, HashSet<ItemStack?>> valStacksByIng = [];
 
-                foreach (var ingredient in recipe.Ingredients)
+                foreach (var ingredient in recipe.Ingredients ?? [])
                 {
-                    HashSet<ItemStack> ingredientStacks = [];
+                    HashSet<ItemStack?> ingredientStacks = [];
 
                     ingredient.Resolve(capi.World, "handbook meal recipes");
-                    foreach (var astack in ObjectCacheUtil.TryGet<ItemStack[]>(capi, "handbookallstacks"))
+                    foreach (ItemStack astack in ObjectCacheUtil.TryGet<ItemStack[]>(capi, "handbookallstacks") ?? [])
                     {
                         if (ingredient.GetMatchingStack(astack) is not CookingRecipeStack vstack) continue;
 

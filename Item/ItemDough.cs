@@ -37,9 +37,9 @@ namespace Vintagestory.GameContent
 
         public override void OnHeldInteractStart(ItemSlot slot, EntityAgent byEntity, BlockSelection blockSel, EntitySelection entitySel, bool firstEvent, ref EnumHandHandling handling)
         {
-            if (blockSel != null)
+            if (blockSel != null && byEntity.Controls.ShiftKey)
             {
-                var block = api.World.BlockAccessor.GetBlock(blockSel.Position);
+                Block block = api.World.BlockAccessor.GetBlock(blockSel.Position);
                 if (block.Attributes?.IsTrue("pieFormingSurface") == true)
                 {
                     if (slot.StackSize >= 2)

@@ -4,8 +4,6 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Util;
 
-#nullable enable
-
 namespace Vintagestory.GameContent
 {
     public class ItemDough : Item

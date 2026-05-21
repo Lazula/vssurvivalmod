@@ -9,8 +9,6 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
-#nullable enable
-
 namespace Vintagestory.GameContent
 {
     public class MealMeshCache : ModSystem, ITexPositionSource

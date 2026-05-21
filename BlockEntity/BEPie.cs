@@ -11,8 +11,6 @@ using System;
 using Vintagestory.API.Util;
 using Vintagestory.API;
 
-#nullable enable
-
 namespace Vintagestory.GameContent
 {
     public enum EnumPiePartType

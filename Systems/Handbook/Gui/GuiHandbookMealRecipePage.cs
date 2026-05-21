@@ -9,8 +9,6 @@ using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
-#nullable enable
-
 namespace Vintagestory.GameContent
 {
     class IngredientMinMax

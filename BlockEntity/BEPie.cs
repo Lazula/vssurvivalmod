@@ -22,8 +22,10 @@ namespace Vintagestory.GameContent
     /// Defines the type of ingredient (crust, filling, topping), food
     /// category, and what mixing codes it can be used with, if any.
     /// </summary>
+    [DocumentAsJson]
     public class InPieProperties
     {
+        [DocumentAsJson("Required")]
         public required AssetLocation Texture;
 
         /// <summary>
@@ -33,6 +35,7 @@ namespace Vintagestory.GameContent
         /// If false, MixingCodes has no effect because this ingredient
         /// cannot be combined with anything else.
         /// </summary>
+        [DocumentAsJson("Optional")]
         public bool AllowMixing = true;
 
         /// <summary>
@@ -51,6 +54,7 @@ namespace Vintagestory.GameContent
         ///   restricted by mixing codes. Any crust may be used in place
         ///   of a topping without being restricted by mixing codes.
         /// </summary>
+        [DocumentAsJson("Required")]
         public EnumPiePartType PartType;
 
         /// <summary>
@@ -79,6 +83,7 @@ namespace Vintagestory.GameContent
         /// Note that the field default is never used when created by ReadFrom, which
         /// has its own default value.
         /// </summary>
+        [DocumentAsJson("Optional")]
         public EnumFoodCategory FoodCategory = EnumFoodCategory.Unknown;
 
         /// <summary>
@@ -102,6 +107,7 @@ namespace Vintagestory.GameContent
         /// To disable the food category code entirely, see UseFoodCategoryMixingCode.
         /// If MixingCodes is empty, the food category code will always be added.
         /// </summary>
+        [DocumentAsJson("Optional")]
         public string[] MixingCodes = [];
 
         /// <summary>
@@ -113,6 +119,7 @@ namespace Vintagestory.GameContent
         /// <br/><br/>
         /// If MixingCodes is empty, the food category code will always be added.
         /// </summary>
+        [DocumentAsJson("Optional")]
         public bool UseFoodCategoryMixingCode = true;
 
         /// <summary>

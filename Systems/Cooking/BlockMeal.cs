@@ -140,7 +140,8 @@ namespace Vintagestory.GameContent
 
         protected virtual bool tryHeldBeginEatMeal(ItemSlot slot, EntityAgent byEntity, ref EnumHandHandling handHandling)
         {
-            if (GetContentNutritionProperties(api.World, slot, byEntity) != null)
+            bool shouldGroundStore = byEntity.Controls.ShiftKey && (byEntity as EntityPlayer)?.BlockSelection != null;
+            if (!shouldGroundStore && GetContentNutritionProperties(api.World, slot, byEntity) != null)
             {
                 byEntity.World.RegisterCallback((dt) =>
                 {

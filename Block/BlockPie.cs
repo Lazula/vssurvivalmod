@@ -580,8 +580,8 @@ namespace Vintagestory.GameContent
                 [
                     new ()
                     {
-                        Code = "crust",
-                        TypeName = "piecrust",
+                        Code = "dough",
+                        TypeName = "bottomcrust",
                         MinQuantity = 1,
                         MaxQuantity = 1,
                         ValidStacks = [.. crusts.Select<ItemStack, CookingRecipeStack>(crust => new ()
@@ -608,8 +608,8 @@ namespace Vintagestory.GameContent
                     },
                     new ()
                     {
-                        Code = "topping",
-                        TypeName = "pietopping",
+                        Code = "crust",
+                        TypeName = "topcrust",
                         MinQuantity = 0,
                         MaxQuantity = 1,
                         ValidStacks = [.. toppings.Select<ItemStack, CookingRecipeStack>(topping => new ()
@@ -743,9 +743,9 @@ namespace Vintagestory.GameContent
                 }
 
                 randomPie = [];
-                addIngredient(ref randomPie, "crust", ref valIngStacks, ref requestedIngredient);
+                addIngredient(ref randomPie, "dough", ref valIngStacks, ref requestedIngredient);
                 addIngredient(ref randomPie, "filling", ref valIngStacks, ref requestedIngredient);
-                addIngredient(ref randomPie, "topping", ref valIngStacks, ref requestedIngredient);
+                addIngredient(ref randomPie, "crust", ref valIngStacks, ref requestedIngredient);
 
                 while (randomPie.Count < 6) randomPie.Add(null);
             }

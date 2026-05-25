@@ -10,6 +10,7 @@ using Vintagestory.API.Datastructures;
 using System;
 using Vintagestory.API.Util;
 using Vintagestory.API;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Vintagestory.GameContent
 {
@@ -19,8 +20,8 @@ namespace Vintagestory.GameContent
     }
 
     /// <summary>
-    /// Defines the type of ingredient (crust, filling, topping), food
-    /// category, and what mixing codes it can be used with, if any.
+    /// Defines the type of ingredient (crust, filling, topping), food category
+    /// for mixing, and what mixing codes it can be used with, if any.
     /// </summary>
     [DocumentAsJson]
     public class InPieProperties
@@ -29,11 +30,18 @@ namespace Vintagestory.GameContent
         public required AssetLocation Texture;
 
         /// <summary>
+        /// The shape to use if this is a topping. Must be the
+        /// shape of the entire pie, including the topping.
+        /// </summary>
+        [DocumentAsJson("Optional")]
+        public Shape? ToppingShape = null;
+
+        /// <summary>
         /// Is this filling allowed to mix with other ingredients?
         /// Crusts and toppings ignore this.
         /// <br/><br/>
         /// If false, MixingCodes has no effect because this ingredient
-        /// cannot be combined with anything else.
+        /// cannot be combined with anything else. Don't do this.
         /// </summary>
         [DocumentAsJson("Optional")]
         public bool AllowMixing = true;
@@ -58,7 +66,13 @@ namespace Vintagestory.GameContent
         public EnumPiePartType PartType;
 
         /// <summary>
-        /// The food category of the ingredient when used in a pie.
+        /// The food category of the ingredient when used in a pie. This does
+        /// not affect the actual nutrition when consumed. It is only used
+        /// to determine which category mixing code to add.
+        ///
+        /// A pie of the NoNutrition category cannot be added to pies unless
+        /// there is an explicit matching mixing code. A NoNutrition ingredient
+        /// with no mixing codes is an error.
         /// <br/><br/>
         /// Checks in order, stopping once a value is found:
         /// <br/><br/>
@@ -78,23 +92,19 @@ namespace Vintagestory.GameContent
         /// <br/>
         ///     4b. NutritionProps.FoodCategory
         /// <br/>
-        ///   5. Default to vegetable
-        /// <br/><br/>
-        /// Note that the field default is never used when created by ReadFrom, which
-        /// has its own default value.
+        ///   5. Default to NoNutrition
         /// </summary>
         [DocumentAsJson("Optional")]
-        public EnumFoodCategory FoodCategory = EnumFoodCategory.Unknown;
+        public EnumFoodCategory FoodCategory = EnumFoodCategory.NoNutrition;
 
         /// <summary>
         /// A list of mixing codes that are allowed for this ingredient. When
         /// checking for mixing codes, the first mixing code present in all
         /// ingredients is used for the pie type.
         /// <br/><br/>
-        /// If UseFoodCategoryMixingCode is true and the ingredient does
-        /// not already include the code for its food category, it will
-        /// be prepended to the front. This means that by default, mixing codes
-        /// are of a lower priority than the food category:
+        /// If the ingredient's food category is not NoNutrition and the category
+        /// code is not already present, it will be prepended. This means that by
+        /// default, mixing codes are of a lower priority than the food category:
         /// <br/>
         /// [ "potpie" ] -> [ "vegetable", "potpie" ]
         /// <br/><br/>
@@ -104,23 +114,11 @@ namespace Vintagestory.GameContent
         /// <br/>
         /// [ "mushroom", "vegetable", "potpie" ]
         /// <br/><br/>
-        /// To disable the food category code entirely, see UseFoodCategoryMixingCode.
         /// If MixingCodes is empty, the food category code will always be added.
+        /// It is an error for MixingCodes to be empty with NoNutrition.
         /// </summary>
         [DocumentAsJson("Optional")]
         public string[] MixingCodes = [];
-
-        /// <summary>
-        /// If disabled, prevents the food category tag from being added if it isn't
-        /// present. The ingredient will not be usable in generic pies for its food
-        /// category, instead only being usable with its specific mixing codes.
-        /// 
-        /// If not present in the pie properties, tries to use the object's nutritionPropsWhenInMeal.
-        /// <br/><br/>
-        /// If MixingCodes is empty, the food category code will always be added.
-        /// </summary>
-        [DocumentAsJson("Optional")]
-        public bool UseFoodCategoryMixingCode = true;
 
         /// <summary>
         /// Read pie properties from Attributes
@@ -132,7 +130,7 @@ namespace Vintagestory.GameContent
 
             // Get the food category manually. It doesn't need to be present in the pie properties,
             // but making the field nullable is unnecessary after parsing.
-            if (props.FoodCategory == EnumFoodCategory.Unknown)
+            if (props.FoodCategory == EnumFoodCategory.NoNutrition)
             {
                 EnumFoodCategory? foodCat = null;
 
@@ -145,12 +143,15 @@ namespace Vintagestory.GameContent
                 foodCat ??= obj?.Attributes?["nutritionPropsWhenInMeal"]?.AsObject<FoodNutritionProperties>()?.FoodCategory;
                 foodCat ??= obj?.GetNutritionProperties(null, null, null)?.FoodCategory;
 
-                props.FoodCategory = foodCat ?? EnumFoodCategory.Unknown;
+                props.FoodCategory = foodCat ?? EnumFoodCategory.NoNutrition;
             }
 
+            // Never add the code for NoNutrition.
+            if (props.FoodCategory == EnumFoodCategory.NoNutrition) return props;
+
+            // Add the food category code if there are no mixing codes or if it wasn't explicitly added.
             string foodCatCode = props.FoodCategory.ToString().ToLowerInvariant();
-            bool missingFoodCatCode = props.UseFoodCategoryMixingCode && !props.MixingCodes.Contains(foodCatCode);
-            if (props.MixingCodes.Length == 0 || missingFoodCatCode)
+            if (props.MixingCodes.Length == 0 || !props.MixingCodes.Contains(foodCatCode))
             {
                 props.MixingCodes = props.MixingCodes.Prepend(foodCatCode).ToArray();
             }
@@ -169,15 +170,15 @@ namespace Vintagestory.GameContent
     }
 
     /// <summary>
-    /// A single-slot inventory that hold a BlockPie ItemStack. The pie itemstack
+    /// A single-slot inventory that hold a <see cref="BlockPie" /> ItemStack. The pie itemstack
     /// is a container with 6 slots. This makes it easy to convert it to a normal
     /// pie ItemStack.
-    /// 
+    ///
+    /// GetContents() is an ItemStack[6]. Unused slots are represented as null.
+    ///
     /// [0]: Base dough
     /// [1-4]: Filling
     /// [5]: Crust dough
-    /// 
-    /// The number of content stacks is always 6. Unused slots are represented as null.
     /// </summary>
     public class BlockEntityPie : BlockEntityContainer
     {
@@ -227,14 +228,15 @@ namespace Vintagestory.GameContent
 
 
 
-        MealMeshCache? ms;
-        MeshData? mesh;
+        MealMeshCache ms = null!;
+        MeshData mesh = null!;
 
         public BlockEntityPie() : base()
         {
             inv = new InventoryGeneric(1, null, null);
         }
 
+        [MemberNotNull(nameof(ms), nameof(mesh))]
         public override void Initialize(ICoreAPI api)
         {
             base.Initialize(api);
@@ -290,7 +292,18 @@ namespace Vintagestory.GameContent
 
         public void OnPlaced(IPlayer? byPlayer)
         {
-            if (byPlayer?.InventoryManager.ActiveHotbarSlot.TakeOut(2) is not ItemStack doughStack) return;
+            ItemStack? doughStack;
+            if (byPlayer?.WorldData.CurrentGameMode == EnumGameMode.Creative)
+            {
+                doughStack = byPlayer?.InventoryManager.ActiveHotbarSlot.Itemstack?.Clone();
+                if (doughStack != null) doughStack.StackSize = 2;
+            }
+            else
+            {
+                doughStack = byPlayer?.InventoryManager.ActiveHotbarSlot.TakeOut(2);
+            }
+
+            if (doughStack == null) return;
 
             ItemStack pie = new(Block);
             (pie.Block as BlockPie)?.SetContents(pie, [doughStack, null, null, null, null, null]);
@@ -426,7 +439,7 @@ namespace Vintagestory.GameContent
             errMessage = null;
             emptySlotIndex = null;
 
-            if (InPieProperties.ReadFrom(stack) is not InPieProperties pieProps)
+            if (InPieProperties.ReadFrom(stack) is not InPieProperties pieProps || pieProps.FoodCategory == EnumFoodCategory.NoNutrition)
             {
                 errCode = "notpieable";
                 errMessage = Lang.Get("This item can not be added to pies");
@@ -571,7 +584,15 @@ namespace Vintagestory.GameContent
                 }
             }
 
-            cStacks[(int)emptySlotIndex!] = slot.TakeOut(2);
+            if (byPlayer?.WorldData.CurrentGameMode == EnumGameMode.Creative)
+            {
+                cStacks[(int)emptySlotIndex!] = slot.Itemstack!.Clone();
+                cStacks[(int)emptySlotIndex].StackSize = 2;
+            }
+            else
+            {
+                cStacks[(int)emptySlotIndex!] = slot.TakeOut(2);
+            }
             pieBlock.SetContents(inv[0].Itemstack, cStacks);
 
             return true;
@@ -587,7 +608,7 @@ namespace Vintagestory.GameContent
         void loadMesh()
         {
             if (Api == null || Api.Side == EnumAppSide.Server || inv[0].Empty) return;
-            mesh = ms!.GetPieMesh(inv[0].Itemstack);
+            mesh = ms.GetPieMesh(inv[0].Itemstack);
         }
 
         public override void GetBlockInfo(IPlayer forPlayer, StringBuilder dsc)

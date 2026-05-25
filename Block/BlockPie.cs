@@ -10,8 +10,6 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
-#nullable enable
-
 namespace Vintagestory.GameContent
 {
     public class PieTopCrustType
@@ -20,10 +18,13 @@ namespace Vintagestory.GameContent
         public required string ShapeElement;
     }
 
-    // Definition: GetContents() must always return a ItemStack[] of array length 6
-    // [0] = crust
-    // [1-4] = filling
-    // [5] = topping (unused atm)
+    /// <summary>
+    /// GetContents() is an ItemStack[6]. Unused slots are represented as null.
+    ///
+    /// [0]: Base dough
+    /// [1-4]: Filling
+    /// [5]: Crust dough
+    /// </summary>
     public class BlockPie : BlockMeal, IBakeableCallback, IShelvable
     {
         /// <summary>
@@ -32,7 +33,7 @@ namespace Vintagestory.GameContent
         public string State => Variant["state"];
         protected override bool PlacedBlockEating => false;
 
-        public EnumShelvableLayout? GetShelvableType(ItemStack stack)
+        public static EnumShelvableLayout? GetShelvableType(ItemStack stack)
         {
             return stack.Attributes.GetAsInt("pieSize") switch
             {
@@ -41,7 +42,8 @@ namespace Vintagestory.GameContent
                 _ => EnumShelvableLayout.SingleCenter
             };
         }
-        public ModelTransform? GetOnShelfTransform(ItemStack stack)
+
+        public static ModelTransform? GetOnShelfTransform(ItemStack stack)
         {
             return GetShelvableType(stack) switch
             {
@@ -77,7 +79,8 @@ namespace Vintagestory.GameContent
                 {
                     foreach (CollectibleObject obj in api.World.Collectibles)
                     {
-                        EnumPiePartType? partType = InPieProperties.ReadFrom(obj)?.PartType;
+                        if (InPieProperties.ReadFrom(obj) is not InPieProperties pieProps || pieProps.FoodCategory == EnumFoodCategory.NoNutrition) continue;
+                        EnumPiePartType partType = pieProps.PartType;
 
                         if (obj is ItemDough || partType == EnumPiePartType.Crust)
                         {
@@ -95,6 +98,20 @@ namespace Vintagestory.GameContent
                             case EnumPiePartType.Crust:
                                 toppingStacks.Add(new ItemStack(obj, 2));
                                 break;
+                        }
+
+                        if (pieProps.PartType == EnumPiePartType.Filling || pieProps.PartType == EnumPiePartType.Topping)
+                        {
+                            int nonFoodCatCodes = pieProps.MixingCodes.Where(code => code != pieProps.FoodCategory.ToString().ToLowerInvariant()).ToArray().Length;
+                            if (nonFoodCatCodes == 0 && pieProps.FoodCategory == EnumFoodCategory.NoNutrition)
+                            {
+                                api.World.Logger.Error($"InPieProperties for filling {obj.Code} has no mixing codes and food category NoNutrition. It cannot be added to pies! See the documentation.");
+                            }
+
+                            if (!pieProps.AllowMixing && nonFoodCatCodes > 0)
+                            {
+                                api.World.Logger.Error($"InPieProperties for filling {obj.Code} has explicit mixingCodes, but allowMixing is disabled. Mixing codes will be ignored. Don't do this intentionally. Allow mixing or remove the mixing codes to suppress this error.");
+                            }
                         }
                     }
                 }
@@ -320,15 +337,16 @@ namespace Vintagestory.GameContent
         }
 
         /// <summary>
-        /// The food category of the ingredient when used in a pie.
-        /// 
-        /// See InPieProperties.ReadFrom()
+        /// The food category mixing code for the ingredient when used in a pie.
+        /// This is not the actual food category when consumed.
+        ///
+        /// See InPieProperties.FoodCategory documentation
         /// </summary>
         public static EnumFoodCategory IngredientFoodCategory(ItemStack? stack)
         {
             if (InPieProperties.ReadFrom(stack) is InPieProperties pieProps) return pieProps.FoodCategory;
 
-            return EnumFoodCategory.Unknown;
+            return EnumFoodCategory.NoNutrition;
         }
 
 
@@ -642,9 +660,9 @@ namespace Vintagestory.GameContent
                     ingredient.Resolve(api.World, "handbook meal recipes");
                     foreach (ItemStack? astack in ingredient.ValidStacks.Select(stack => stack.ResolvedItemstack))
                     {
-                        if (ingredient.GetMatchingStack(astack) is not { } vstack) continue;
+                        if (ingredient.GetMatchingStack(astack) is not CookingRecipeStack vstack) continue;
 
-                        if (astack?.Clone() is { } stack && BlockLiquidContainerBase.GetContainableProps(stack) is { } props)
+                        if (astack?.Clone() is ItemStack stack && BlockLiquidContainerBase.GetContainableProps(stack) is WaterTightContainableProps props)
                         {
                             stack.StackSize = vstack.StackSize * (int)(props.ItemsPerLitre * ingredient.PortionSizeLitres);
                             ingredientStacks.Add(stack);
@@ -662,9 +680,6 @@ namespace Vintagestory.GameContent
 
                 cachedValidStacksByIngredient = validStacksByIngredient;
             };
-
-            if (validStacksByIngredient == null) return new ItemStack?[6];
-
 
 
             void addIngredient(ref List<ItemStack?> pie, string code, ref Dictionary<CookingRecipeIngredient, List<ItemStack?>> valIngStacks, ref CookingRecipeIngredient? requestedIngredient)
@@ -797,15 +812,22 @@ namespace Vintagestory.GameContent
 
             if (GetContents(world, stack) is ItemStack[] contents && contents.Length > 1)
             {
-                if (InPieProperties.ReadFrom(contents[1])?.AllowMixing == false)
+                InPieProperties? pieProps = InPieProperties.ReadFrom(contents[1]);
+                if (pieProps?.AllowMixing == false)
                 {
                     type = "single-" + contents[1].Collectible.Code.ToShortString();
                 }
-                else type = "mixed-" + IngredientFoodCategory(contents[1]).ToString().ToLowerInvariant();
+                else
+                {
+                    type = "mixed-" + IngredientFoodCategory(contents[1]).ToString().ToLowerInvariant();
+                }
 
                 return "handbook-mealrecipe-" + type + "-pie";
             }
-            else return "craftinginfo-pie";
+            else
+            {
+                return "craftinginfo-pie";
+            }
         }
     }
 }

@@ -176,7 +176,7 @@ namespace Vintagestory.GameContent
             InPieProperties[] stackPieProps = contentStacks.Select(InPieProperties.ReadFrom).ToArray()!;
 
             bool singleIngredient = true;
-            IEnumerable<string> mixCodes = stackPieProps[1].MixingCodes ?? [];
+            IEnumerable<string> mixCodes = stackPieProps[1]?.MixingCodes ?? [];
             for (int i = 2; i < contentStacks.Length - 1; i++)
             {
                 if (contentStacks[i] == null) continue;

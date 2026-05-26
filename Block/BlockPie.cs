@@ -701,22 +701,12 @@ namespace Vintagestory.GameContent
                 }
 
                 // Only fillings need the code below here for filtering, so we skip the
-                // list copying if possible.
+                // list copying for crusts and toppings.
                 if (code != "filling")
                 {
                     pie.Add(validStacks[api.World.Rand.Next(validStacks.Count)]?.Clone());
                     return;
                 }
-
-                // When we add an ingredient, we filter out all the other ingredients
-                // that have any of the same codes that aren't the recipe code.
-                // This ensures we get the widest selection possible
-                // in order to minimize the chance of accidentally getting a pie
-                // that is considered a different category than requested.
-                //
-                // We try to include as many codes as possible to avoid accidentally
-                // getting a more specific type of pie, e.g. we don't want to get all
-                // vegetables when we're trying to generate a pot pie.
 
                 List<ItemStack?> filteredValidStacks = validStacks;
                 string recipeCode = recipe.Code?.Split("-").ElementAtOrDefault(1) ?? "";

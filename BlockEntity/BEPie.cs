@@ -38,10 +38,12 @@ namespace Vintagestory.GameContent
 
         /// <summary>
         /// Is this filling allowed to mix with other ingredients?
-        /// Crusts and toppings ignore this.
+        /// Crusts and toppings ignore this, but toppings always
+        /// require a matching mixing code.
         /// <br/><br/>
         /// If false, MixingCodes has no effect because this ingredient
-        /// cannot be combined with anything else. Don't do this.
+        /// cannot be combined with anything else. Don't add mixing codes
+        /// if this is disabled.
         /// </summary>
         [DocumentAsJson("Optional")]
         public bool AllowMixing = true;
@@ -68,7 +70,8 @@ namespace Vintagestory.GameContent
         /// <summary>
         /// The food category of the ingredient when used in a pie. This does
         /// not affect the actual nutrition when consumed. It is only used
-        /// to determine which category mixing code to add.
+        /// to determine which category mixing code to prepend in the case
+        /// that the code is not already present.
         ///
         /// A pie of the NoNutrition category cannot be added to pies unless
         /// there is an explicit matching mixing code. A NoNutrition ingredient
@@ -113,6 +116,11 @@ namespace Vintagestory.GameContent
         /// a "mushroom" mixing code that would take precedence over "vegetable".
         /// <br/>
         /// [ "mushroom", "vegetable", "potpie" ]
+        /// <br/><br/>
+        /// An ingredient may have multiple food category mixing codes. It will be
+        /// allowed in any of those mixed pies and will not affect mixing codes.
+        /// If it is the only ingredient, its first mixing code will determine the
+        /// pie type.
         /// <br/><br/>
         /// If MixingCodes is empty, the food category code will always be added.
         /// It is an error for MixingCodes to be empty with NoNutrition.
@@ -236,7 +244,7 @@ namespace Vintagestory.GameContent
             inv = new InventoryGeneric(1, null, null);
         }
 
-        [MemberNotNull(nameof(ms), nameof(mesh))]
+        [MemberNotNull(nameof(ms))]
         public override void Initialize(ICoreAPI api)
         {
             base.Initialize(api);
@@ -342,6 +350,7 @@ namespace Vintagestory.GameContent
                         );
                     }
 
+                    MarkDirty(true);
                 }
                 else if (ToppingType == EnumPiePartType.Crust)
                 {
@@ -357,8 +366,8 @@ namespace Vintagestory.GameContent
             }
 
             // Filling rules:
-            // 1. get inPieProperties
-            // 2. any filing there yet? if not, all good
+            // 1. Get inPieProperties
+            // 2. Any filing there yet? If not, all good
             // 3. Is full: Can't add more.
             // 3. If partially full, must
             //    a.) be of same foodcat
@@ -366,7 +375,7 @@ namespace Vintagestory.GameContent
 
             // If the pie can be picked up into the current hotbar slot,
             // skip trying to add the held stack as filling. Prevents
-            // the cannot be added to pies" error message.
+            // the "cannot be added to pies" error message.
             bool canPickUpIntoHand = hotbarSlot?.Empty == false && inv[0].Itemstack?.Collectible.GetMergableQuantity(hotbarSlot.Itemstack, inv[0].Itemstack, EnumMergePriority.DirectMerge) > 0;
 
             if (hotbarSlot?.Empty == false && !canPickUpIntoHand && pieBlock.State == "raw")
@@ -608,7 +617,7 @@ namespace Vintagestory.GameContent
         void loadMesh()
         {
             if (Api == null || Api.Side == EnumAppSide.Server || inv[0].Empty) return;
-            mesh = ms.GetPieMesh(inv[0].Itemstack);
+            mesh = ms!.GetPieMesh(inv[0].Itemstack)!;
         }
 
         public override void GetBlockInfo(IPlayer forPlayer, StringBuilder dsc)

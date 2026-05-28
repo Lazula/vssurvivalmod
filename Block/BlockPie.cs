@@ -395,7 +395,7 @@ namespace Vintagestory.GameContent
 
 
             TransitionableProperties[] propsm = pieStack.Collectible.GetTransitionableProperties(api.World, pieStack, null);
-            if (propsm != null && propsm.Length > 0)
+            if (propsm?.Length > 0)
             {
                 pieStack.Collectible.AppendPerishableInfoText(inSlot, dsc, api.World);
             }

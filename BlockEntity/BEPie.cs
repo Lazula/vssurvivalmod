@@ -315,6 +315,33 @@ namespace Vintagestory.GameContent
 
             ItemStack pie = new(Block);
             (pie.Block as BlockPie)?.SetContents(pie, [doughStack, null, null, null, null, null]);
+
+            // Copy over the transition states so that we don't make a completely fresh pie from spoiling dough
+            if (doughStack.Collectible.UpdateAndGetTransitionStates(byPlayer?.Entity.World, new DummySlot(doughStack)) is TransitionState[] doughStates
+                && pie.Collectible.UpdateAndGetTransitionStates(byPlayer?.Entity.World, new DummySlot(pie)) is TransitionState[] pieStates)
+            {
+
+                for (int i = 0; i < doughStates.Length; i++)
+                {
+                    if (doughStates[i].TransitionLevel > 0)
+                    {
+                        float scaledHours = pieStates[i].FreshHours + pieStates[i].TransitionHours * doughStates[i].TransitionLevel;
+
+                        if (Api.Side.IsServer()) Api.Logger.Debug($"Scaled spoiling dough lifetime to pie; {pieStates[i].FreshHours} + {pieStates[i].TransitionHours} * {doughStates[i].TransitionLevel}");
+
+                        pie.Collectible.SetTransitionState(pie, doughStates[i].Props.Type, scaledHours);
+                    }
+                    else
+                    {
+                        float scaledHours = doughStates[i].TransitionedHours / (pieStates[i].TransitionHours / doughStates[i].TransitionHours);
+
+                        if (Api.Side.IsServer()) Api.Logger.Debug($"Scaled fresh dough lifetime to pie; {doughStates[i].TransitionedHours} / ({pieStates[i].TransitionHours} / {doughStates[i].TransitionHours}) = {scaledHours}");
+
+                        pie.Collectible.SetTransitionState(pie, doughStates[i].Props.Type, scaledHours);
+                    }
+                }
+            }
+
             pie.Attributes.SetInt("pieSize", 4);
             pie.Attributes.SetBool("bakeable", false);
             if (State != "raw" && !pie.Attributes.HasAttribute("quantityServings"))
@@ -567,15 +594,13 @@ namespace Vintagestory.GameContent
         {
             ICoreClientAPI? capi = byPlayer != null ? Api as ICoreClientAPI : null;
 
-            if (inv[0].Itemstack?.Block is not BlockPie pieBlock) return false;
+            if (PieBlock == null) return false;
 
             if (!CanAddIngredient(slot.Itemstack, out int? emptySlotIndex, out string? errCode, out string? errMessage))
             {
                 capi?.TriggerIngameError(this, errCode, errMessage);
                 return false;
             }
-
-            ItemStack[] cStacks = pieBlock.GetContents(Api.World, inv[0].Itemstack);
 
             if (InPieProperties.ReadFrom(slot.Itemstack)!.PartType == EnumPiePartType.Crust)
             {
@@ -593,16 +618,41 @@ namespace Vintagestory.GameContent
                 }
             }
 
+            ItemStack ingStack;
+
             if (byPlayer?.WorldData.CurrentGameMode == EnumGameMode.Creative)
             {
-                cStacks[(int)emptySlotIndex!] = slot.Itemstack!.Clone();
-                cStacks[(int)emptySlotIndex].StackSize = 2;
+                ingStack = slot.Itemstack!.Clone();
+                ingStack.StackSize = 2;
             }
             else
             {
-                cStacks[(int)emptySlotIndex!] = slot.TakeOut(2);
+                ingStack = slot.TakeOut(2);
             }
-            pieBlock.SetContents(inv[0].Itemstack, cStacks);
+
+            ItemStack[] cStacks = PieBlock.GetContents(Api.World, inv[0].Itemstack);
+            int ingredientCount = cStacks.Where(stack => stack != null).Count();
+
+            // Average transition states before adding
+            float t = (float)1 / (1 + ingredientCount);
+            if (byPlayer?.Entity.World != null
+                && ingStack.Collectible.UpdateAndGetTransitionStates(byPlayer.Entity.World, new DummySlot(ingStack)) is TransitionState[] ingStates
+                && PieBlock.UpdateAndGetTransitionStates(byPlayer.Entity.World, inv[0]) is TransitionState[] pieStates)
+            {
+                for (int i = 0; i < ingStates.Length; i++)
+                {
+                    float totalIngHours = ingStates[i].FreshHours + ingStates[i].TransitionHours;
+                    float totalPieHours = pieStates[i].FreshHours + pieStates[i].TransitionHours;
+                    float scaledIngTransitionedHours = ingStates[i].TransitionedHours / (totalIngHours / totalPieHours);
+
+                    var avgTransitionedHours = scaledIngTransitionedHours * t + pieStates[i].TransitionedHours * (1 - t);
+                    if (Api.Side.IsServer()) Api.Logger.Debug($"Averaged new ingredient: {ingStates[i].TransitionedHours / (totalIngHours / totalPieHours)} * {t} + {pieStates[i].TransitionedHours} * {1 - t}");
+                    PieBlock.SetTransitionState(inv[0].Itemstack, ingStates[i].Props.Type, avgTransitionedHours);
+                }
+            }
+
+            cStacks[(int)emptySlotIndex!] = ingStack;
+            PieBlock.SetContents(inv[0].Itemstack, cStacks);
 
             return true;
         }

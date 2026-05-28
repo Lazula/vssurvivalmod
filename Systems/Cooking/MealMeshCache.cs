@@ -187,18 +187,26 @@ namespace Vintagestory.GameContent
                 if (!singleIngredient && !mixCodes.Any()) break;
             }
 
-            if (stackPieProps[0] != null)
+            if (stackPieProps[0]?.Texture != null)
             {
-                crustTextureLoc = stackPieProps[0]!.Texture.Clone();
+                crustTextureLoc = stackPieProps[0].Texture.Clone();
                 crustTextureLoc.Path = crustTextureLoc.Path.Replace("{bakelevel}", "" + (bakeLevel + 1));
                 fillingTextureLoc = new AssetLocation("block/transparent");
             }
+            else if (stackPieProps[0] != null)
+            {
+                capi!.Logger.Error($"Bottom crust {contentStacks[0].Collectible.Code} does not have a texture!");
+            }
 
             topCrustTextureLoc = new AssetLocation("block/transparent");
-            if (stackPieProps[5] != null)
+            if (stackPieProps[5]?.Texture != null)
             {
                 topCrustTextureLoc = stackPieProps[5]!.Texture.Clone();
                 topCrustTextureLoc.Path = topCrustTextureLoc.Path.Replace("{bakelevel}", "" + (bakeLevel + 1));
+            }
+            else if (stackPieProps[5] != null)
+            {
+                capi!.Logger.Error($"Topping {contentStacks[5].Collectible.Code} does not have a texture!");
             }
 
             if (contentStacks[1] != null)
@@ -232,12 +240,21 @@ namespace Vintagestory.GameContent
             if (mixingCode == "dairy") mixingCode = "cheese";
 
             if (singleIngredient) return pieProps[1]?.Texture;
-            if (mixingCode == null) return new("block/food/pie/fill-unknown");
+            if (mixingCode == null)
+            {
+                capi!.Logger.Error("Pie does not have any mixing codes. Using default unknown texture.");
+                return new("block/food/pie/fill-unknown");
+            }
 
             if (!pieMixingCodeFillingTextures.TryGetValue(mixingCode.GetHashCode(), out AssetLocation? loc))
             {
                 loc = new("block/food/pie/fill-mixed" + mixingCode);
                 pieMixingCodeFillingTextures.Add(mixingCode.GetHashCode(), loc);
+            }
+
+            if (loc == null)
+            {
+                capi!.Logger.Error($"No pie texture found for mixing code {mixingCode}.");
             }
 
             return loc;

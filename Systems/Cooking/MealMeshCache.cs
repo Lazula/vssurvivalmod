@@ -223,7 +223,15 @@ namespace Vintagestory.GameContent
             shapeloc.WithPathAppendixOnce(".json").WithPathPrefixOnce("shapes/");
             Shape shape = API.Common.Shape.TryGet(capi, shapeloc);
 
-            string topCrustShapeElement = BlockPie.TopCrustTypes.First(type => type.Code.EqualsFast(BlockPie.GetTopCrustType(pieStack) ?? "full")).ShapeElement;
+            string topCrustShapeElement;
+            if (stackPieProps[5]?.ToppingShapeElement is string toppingShapeElement)
+            {
+                topCrustShapeElement = toppingShapeElement;
+            }
+            else
+            {
+                topCrustShapeElement = BlockPie.TopCrustTypes.First(type => type.Code.EqualsFast(BlockPie.GetTopCrustType(pieStack) ?? "full")).ShapeElement;
+            }
             string[] selectiveElements = ["origin/base/crust regular/*", "origin/base/filling/*", "origin/base/base-quarter/*", "origin/base/fillingquarter/*", topCrustShapeElement];
 
             capi.Tesselator.TesselateShape("pie", shape, out MeshData mesh, this, null, 0, 0, 0, null, selectiveElements);

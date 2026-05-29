@@ -30,11 +30,10 @@ namespace Vintagestory.GameContent
         public required AssetLocation Texture;
 
         /// <summary>
-        /// The shape to use if this is a topping. Must be the
-        /// shape of the entire pie, including the topping.
+        /// The shape to use if this is a topping.
         /// </summary>
-        [DocumentAsJson("Optional")]
-        public string? ToppingShapeElement = null;
+        [DocumentAsJson("Optional", "origin/base/top crust full/*")]
+        public string ToppingShapeElement = "origin/base/top crust full/*";
 
         /// <summary>
         /// Is this filling allowed to mix with other ingredients?
@@ -45,7 +44,7 @@ namespace Vintagestory.GameContent
         /// cannot be combined with anything else. Don't add mixing codes
         /// if this is disabled.
         /// </summary>
-        [DocumentAsJson("Optional")]
+        [DocumentAsJson("Optional", "true")]
         public bool AllowMixing = true;
 
         /// <summary>
@@ -97,7 +96,7 @@ namespace Vintagestory.GameContent
         /// <br/>
         ///   5. Default to NoNutrition
         /// </summary>
-        [DocumentAsJson("Optional")]
+        [DocumentAsJson("Optional", "EnumFoodCategory.NoNutrition")]
         public EnumFoodCategory FoodCategory = EnumFoodCategory.NoNutrition;
 
         /// <summary>
@@ -125,11 +124,11 @@ namespace Vintagestory.GameContent
         /// If MixingCodes is empty, the food category code will always be added.
         /// It is an error for MixingCodes to be empty with NoNutrition.
         /// </summary>
-        [DocumentAsJson("Optional")]
+        [DocumentAsJson("Optional", "[]")]
         public string[] MixingCodes = [];
 
         /// <summary>
-        /// Read pie properties from Attributes
+        /// Read pie properties from Attributes.
         /// </summary>
         /// <returns>Null if "inPieProperties" is malformed or does not exist.</returns>
         public static InPieProperties? ReadFrom(CollectibleObject? obj)

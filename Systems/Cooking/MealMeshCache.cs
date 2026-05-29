@@ -224,9 +224,9 @@ namespace Vintagestory.GameContent
             Shape shape = API.Common.Shape.TryGet(capi, shapeloc);
 
             string topCrustShapeElement;
-            if (stackPieProps[5]?.ToppingShapeElement is string toppingShapeElement)
+            if (stackPieProps[5]?.PartType == EnumPiePartType.Topping)
             {
-                topCrustShapeElement = toppingShapeElement;
+                topCrustShapeElement = stackPieProps[5].ToppingShapeElement;
             }
             else
             {

@@ -73,7 +73,7 @@ namespace Vintagestory.GameContent
         /// to determine which category mixing code to prepend in the case
         /// that the code is not already present.
         ///
-        /// A pie of the NoNutrition category cannot be added to pies unless
+        /// An ingredient of the NoNutrition category cannot be added to pies unless
         /// there is an explicit matching mixing code. A NoNutrition ingredient
         /// with no mixing codes is an error.
         /// <br/><br/>

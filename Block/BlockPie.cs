@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
+using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -12,6 +13,16 @@ using Vintagestory.API.Util;
 
 namespace Vintagestory.GameContent
 {
+    /// <summary>
+    /// A definition for a top crust type, including its code and shape element.
+    /// </summary>
+    /// <example language="json">
+    /// {
+    ///     "code": "full",
+    ///     "shapeElement": "origin/base/top crust full/*"
+    /// }
+    /// </example>
+    [DocumentAsJson]
     public class PieTopCrustType
     {
         public required string Code;

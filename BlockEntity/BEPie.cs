@@ -34,7 +34,7 @@ namespace Vintagestory.GameContent
         /// shape of the entire pie, including the topping.
         /// </summary>
         [DocumentAsJson("Optional")]
-        public Shape? ToppingShape = null;
+        public string? ToppingShapeElement = null;
 
         /// <summary>
         /// Is this filling allowed to mix with other ingredients?

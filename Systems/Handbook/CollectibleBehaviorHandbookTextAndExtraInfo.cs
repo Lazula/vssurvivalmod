@@ -1337,11 +1337,8 @@ namespace Vintagestory.GameContent
                 pierecipes.RemoveAt(0);
                 if (recipe == null) continue;
 
-                ItemStack mealBlock = new(capi.World.BlockAccessor.GetBlock("pie-perfect"));
-                mealBlock.Attributes.SetInt("pieSize", 4);
-                mealBlock.Attributes.SetString("topCrustType", BlockPie.TopCrustTypes[capi.World.Rand.Next(BlockPie.TopCrustTypes.Length)].Code);
-                mealBlock.Attributes.SetInt("bakeLevel", 2);
-                MealstackTextComponent comp = new(capi, mealBlock, recipe, 40, EnumFloat.Inline, (cs) => openDetailPageFor("handbook-mealrecipe-" + recipe.Code + "-pie"), 6, true, stack);
+                ItemStack mealStack = new(capi.World.BlockAccessor.GetBlock("pie-perfect"));
+                MealstackTextComponent comp = new(capi, mealStack, recipe, 40, EnumFloat.Inline, (cs) => openDetailPageFor("handbook-mealrecipe-" + recipe.Code + "-pie"), 6, true, stack);
 
                 components.Add(comp);
             }
@@ -2715,9 +2712,6 @@ namespace Vintagestory.GameContent
                             if (recipe == null) continue;
 
                             ItemStack mealBlock = dstack.Clone();
-                            mealBlock.Attributes.SetInt("pieSize", 4);
-                            mealBlock.Attributes.SetString("topCrustType", BlockPie.TopCrustTypes[capi.World.Rand.Next(BlockPie.TopCrustTypes.Length)].Code);
-                            mealBlock.Attributes.SetInt("bakeLevel", 2);
                             MealstackTextComponent mealComp = new MealstackTextComponent(capi, mealBlock, recipe, 40, EnumFloat.Inline, (cs) => openDetailPageFor("handbook-mealrecipe-" + recipe.Code + "-pie"), 6, true);
                             components.Add(mealComp);
                         }

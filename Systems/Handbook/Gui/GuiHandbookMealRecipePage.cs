@@ -144,10 +144,10 @@ namespace Vintagestory.GameContent
                 secondsVisible = 1;
                 if (!isPie) dummySlot.Itemstack = new(BlockMeal.RandomMealBowl(capi));
                 var cachedValidStacks = ObjectCacheUtil.TryGet<Dictionary<CookingRecipeIngredient, HashSet<ItemStack?>>?>(capi, "valstacksbying-" + Recipe.Code);
-                mealBlock?.SetContents(Recipe.Code, dummySlot.Itemstack!, isPie ? BlockPie.GenerateRandomPie(capi, ref cachedValidStacks, Recipe) : Recipe.GenerateRandomMeal(capi, ref cachedValidStacks, ObjectCacheUtil.TryGet<ItemStack[]>(capi, "handbookallstacks") ?? [], slots), 1);
+                mealBlock?.SetContents(Recipe.Code, dummySlot.Itemstack!, isPie ? BlockPie.GenerateRandomPie(capi, ref cachedValidStacks, Recipe) : Recipe.GenerateRandomMeal(capi, ref cachedValidStacks, ObjectCacheUtil.TryGet<ItemStack[]>(capi, "handbookallstacks") ?? [], slots));
 
                 if ((mealBlock as BlockPie)?.GetContents(capi.World, dummySlot.Itemstack) is ItemStack?[] cStacks
-                    && InPieProperties.ReadFrom(cStacks[5]) is InPieProperties toppingProps
+                    && InPieProperties.ReadFrom(cStacks.ElementAtOrDefault(5)) is InPieProperties toppingProps
                     && toppingProps.PartType == EnumPiePartType.Crust)
                 {
                     dummySlot.Itemstack?.Attributes.SetString("topCrustType", BlockPie.TopCrustTypes[capi.World.Rand.Next(BlockPie.TopCrustTypes.Length)].Code);

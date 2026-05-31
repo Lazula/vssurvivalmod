@@ -64,7 +64,7 @@ namespace Vintagestory.GameContent
         ///   of a topping without being restricted by mixing codes.
         /// </summary>
         [DocumentAsJson("Required")]
-        public EnumPiePartType PartType;
+        public required EnumPiePartType PartType;
 
         /// <summary>
         /// The food category of the ingredient when used in a pie. This does

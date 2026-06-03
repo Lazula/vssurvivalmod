@@ -73,31 +73,36 @@ namespace Vintagestory.GameContent
         /// that the code is not already present.
         ///
         /// An ingredient of the NoNutrition category cannot be added to pies unless
-        /// there is an explicit matching mixing code. A NoNutrition ingredient
-        /// with no mixing codes is an error.
+        /// it has at least one explicit mixing code. A NoNutrition ingredient
+        /// with no mixing codes is an error. NoNutrition may be used explicitly,
+        /// skipping the process below.
+        /// 
         /// <br/><br/>
         /// Checks in order, stopping once a value is found:
         /// <br/><br/>
-        ///   1. If stack is null, default to vegetable
+        ///   1. inPieProperties["foodCategory"]
         /// <br/>
-        ///   2. InPieProperties.FoodCategory
+        ///   2. If stack has ContainableProps:
         /// <br/>
-        ///   3. If stack has ContainableProps:
+        ///     2a. NutritionPropsPerLitreWhenInMeal.FoodCategory
         /// <br/>
-        ///     3a. NutritionPropsPerLitreWhenInMeal.FoodCategory
+        ///     2b. NutritionPropsPerLitre.FoodCategory
         /// <br/>
-        ///     3b. NutritionPropsPerLitre.FoodCategory
+        ///   3. If stack has NutritionProps:
         /// <br/>
-        ///   4. If stack has NutritionProps:
+        ///     3a. NutritionPropsWhenInMeal.FoodCategory
         /// <br/>
-        ///     4a. NutritionPropsWhenInMeal.FoodCategory
+        ///     3b. NutritionProps.FoodCategory
         /// <br/>
-        ///     4b. NutritionProps.FoodCategory
-        /// <br/>
-        ///   5. Default to NoNutrition
+        ///   4. Return the properties as null, because the item does not have.
         /// </summary>
-        [DocumentAsJson("Optional", "EnumFoodCategory.NoNutrition")]
+        [DocumentAsJson("Optional", "See process in docstring")]
         public EnumFoodCategory FoodCategory = EnumFoodCategory.NoNutrition;
+
+        /// <summary>
+        /// Convenience property to check if the ingredient is malformed and thus unusable.
+        /// </summary>
+        public bool CanBeUsed { get => MixingCodes.Length > 0 || FoodCategory != EnumFoodCategory.NoNutrition; }
 
         /// <summary>
         /// A list of mixing codes that are allowed for this ingredient. When
@@ -128,6 +133,38 @@ namespace Vintagestory.GameContent
         public string[] MixingCodes = [];
 
         /// <summary>
+        /// For items; The number of items in the stack used for one layer.
+        /// </summary>
+        [DocumentAsJson("Optional", "2")]
+        public int PortionSize = 2;
+
+        /// <summary>
+        /// For liquids; The number of liters used for one layer.
+        /// </summary>
+        [DocumentAsJson("Optional", "1")]
+        public float PortionSizeLitres = 1;
+
+        public bool IsLiquid = false;
+
+        /// <summary>
+        /// The appropriate portion size based on whether the ingredient is an item or liquid.
+        /// </summary>
+        public float GetPortionSize()
+        {
+            return IsLiquid ? PortionSizeLitres : PortionSize;
+        }
+
+        public float ItemsPerLitre = 100f;
+        /// <summary>
+        /// The number of actual content items per portion.
+        /// </summary>
+        /// <returns></returns>
+        public int ItemsPerPortion()
+        {
+            return IsLiquid ? (int)(PortionSizeLitres * ItemsPerLitre) : PortionSize;
+        }
+
+        /// <summary>
         /// Read pie properties from Attributes.
         /// </summary>
         /// <returns>Null if "inPieProperties" is malformed or does not exist.</returns>
@@ -135,39 +172,56 @@ namespace Vintagestory.GameContent
         {
             if (obj?.Attributes?["inPieProperties"]?.AsObject<InPieProperties>(null, obj.Code.Domain) is not InPieProperties props) return null;
 
-            // Get the food category manually. It doesn't need to be present in the pie properties,
-            // but making the field nullable is unnecessary after parsing.
-            if (props.FoodCategory == EnumFoodCategory.NoNutrition)
+            WaterTightContainableProps? liquidProps = BlockLiquidContainerBase.GetContainableProps(obj);
+
+            // Get the food category manually. It doesn't need to be present in the pie properties.
+            // We do this handling here to avoid making the field nullable.
+
+            // Do not attempt to overwrite NoNutrition if it was set manually, only if it was defaulted to.
+            if (!obj.Attributes["inPieProperties"]["foodCategory"].Exists && props.FoodCategory == EnumFoodCategory.NoNutrition)
             {
                 EnumFoodCategory? foodCat = null;
 
-                if (BlockLiquidContainerBase.GetContainableProps(obj) is WaterTightContainableProps liquidProps)
+                if (liquidProps != null)
                 {
                     foodCat ??= liquidProps.NutritionPropsPerLitreWhenInMeal?.FoodCategory;
                     foodCat ??= liquidProps.NutritionPropsPerLitre?.FoodCategory;
                 }
 
-                foodCat ??= obj?.Attributes?["nutritionPropsWhenInMeal"]?.AsObject<FoodNutritionProperties>()?.FoodCategory;
-                foodCat ??= obj?.GetNutritionProperties(null, null, null)?.FoodCategory;
+                foodCat ??= obj.Attributes?["nutritionPropsWhenInMeal"]?.AsObject<FoodNutritionProperties>()?.FoodCategory;
+                foodCat ??= obj.GetNutritionProperties(null, null, null)?.FoodCategory;
 
                 props.FoodCategory = foodCat ?? EnumFoodCategory.NoNutrition;
+
+                // This ingredient has no nutrition properties at all, so it would do nothing in a pie.
+                if (props.FoodCategory == EnumFoodCategory.NoNutrition)
+                {
+                    return null;
+                }
+            }
+
+            if (liquidProps != null)
+            {
+                props.IsLiquid = true;
+                props.ItemsPerLitre = liquidProps.ItemsPerLitre;
             }
 
             // Never add the code for NoNutrition.
-            if (props.FoodCategory == EnumFoodCategory.NoNutrition) return props;
-
-            // Add the food category code if there are no mixing codes or if it wasn't explicitly added.
-            string foodCatCode = props.FoodCategory.ToString().ToLowerInvariant();
-            if (props.MixingCodes.Length == 0 || !props.MixingCodes.Contains(foodCatCode))
+            if (props.FoodCategory != EnumFoodCategory.NoNutrition)
             {
-                props.MixingCodes = props.MixingCodes.Prepend(foodCatCode).ToArray();
+                // Add the food category code if there are no mixing codes or if it wasn't explicitly added.
+                string foodCatCode = props.FoodCategory.ToString().ToLowerInvariant();
+                if (props.MixingCodes.Length == 0 || !props.MixingCodes.Contains(foodCatCode))
+                {
+                    props.MixingCodes = props.MixingCodes.Prepend(foodCatCode).ToArray();
+                }
             }
 
             return props;
         }
 
         /// <summary>
-        /// Read pie properties from ItemAttributes
+        /// Read pie properties from ItemAttributes.
         /// </summary>
         /// <returns>Null if "inPieProperties" is malformed or does not exist.</returns>
         public static InPieProperties? ReadFrom(ItemStack? stack)
@@ -299,18 +353,19 @@ namespace Vintagestory.GameContent
 
         public void OnPlaced(IPlayer? byPlayer)
         {
-            ItemStack? doughStack;
-            if (byPlayer?.WorldData.CurrentGameMode == EnumGameMode.Creative)
+            if (byPlayer?.InventoryManager.ActiveHotbarSlot.Itemstack?.Clone() is not ItemStack doughStack
+                || InPieProperties.ReadFrom(doughStack) is not InPieProperties pieProps
+                || pieProps.PartType != EnumPiePartType.Crust)
             {
-                doughStack = byPlayer?.InventoryManager.ActiveHotbarSlot.Itemstack?.Clone();
-                if (doughStack != null) doughStack.StackSize = 2;
-            }
-            else
-            {
-                doughStack = byPlayer?.InventoryManager.ActiveHotbarSlot.TakeOut(2);
+                return;
             }
 
-            if (doughStack == null) return;
+            doughStack.StackSize = pieProps.PortionSize;
+
+            if (byPlayer.WorldData.CurrentGameMode != EnumGameMode.Creative)
+            {
+                byPlayer.InventoryManager.ActiveHotbarSlot.TakeOut(pieProps.PortionSize);
+            }
 
             ItemStack pie = new(Block);
             (pie.Block as BlockPie)?.SetContents(pie, [doughStack, null, null, null, null, null]);
@@ -453,7 +508,7 @@ namespace Vintagestory.GameContent
         /// </summary>
         /// <param name="stack"></param>
         /// <returns></returns>
-        public bool CanAddIngredient(ItemStack? stack)
+        public bool CanAddIngredient(ItemStack stack)
         {
             return CanAddIngredient(stack, out _, out _, out _);
         }
@@ -464,28 +519,53 @@ namespace Vintagestory.GameContent
         /// Does not add the ingredient. See <see cref="TryAddIngredientFrom" />
         /// </summary>
         /// <param name="stack">The item to add to the pie.</param>
-        /// <param name="emptySlotIndex">If the ingredient can be added, the slot to which is would be placed in.</param>
+        /// <param name="emptySlotIndex">If the ingredient can be added, the slot to which it would be placed in.</param>
         /// <param name="errCode">If the ingredient cannot be added, the error code describing what went wrong.</param>
         /// <param name="errMessage">If the ingredient cannot be added, the localized error message to display.</param>
-        /// <returns>True if the stack can be added to the pie.</returns>
-        public bool CanAddIngredient(ItemStack? stack, out int? emptySlotIndex, out string? errCode, out string? errMessage)
+        /// <returns>True if the stack can be added to the pie. Note that if the action should succeed, but no stack
+        /// is actually added, such as changing crust type, it will return true but leave emptySlotIndex null.</returns>
+        public bool CanAddIngredient(ItemStack stack, out int? emptySlotIndex, out string? errCode, out string? errMessage)
         {
             errCode = null;
             errMessage = null;
             emptySlotIndex = null;
 
-            if (InPieProperties.ReadFrom(stack) is not InPieProperties pieProps || pieProps.FoodCategory == EnumFoodCategory.NoNutrition)
+            ILiquidSource? container = stack.Collectible.GetCollectibleInterface<ILiquidSource>();
+            if (container?.AllowHeldLiquidTransfer == false)
             {
                 errCode = "notpieable";
                 errMessage = Lang.Get("This item can not be added to pies");
                 return false;
             }
 
-            // Not null if pieProps exists
-            if (stack!.StackSize < 2)
+            ItemStack contentStack = stack;
+            if (container != null)
+            {
+                if (container.GetContent(stack) is ItemStack cStack)
+                {
+                    contentStack = cStack;
+                }
+                else
+                {
+                    errCode = "notpieable";
+                    errMessage = Lang.Get("This item can not be added to pies");
+                    return false;
+                }
+            }
+
+            InPieProperties? pieProps = InPieProperties.ReadFrom(contentStack);
+            if (pieProps == null || !pieProps.CanBeUsed)
+            {
+                errCode = "notpieable";
+                errMessage = Lang.Get("This item can not be added to pies");
+                return false;
+            }
+
+            float totalPortions = contentStack.StackSize / pieProps.GetPortionSize();
+            if (totalPortions < 1)
             {
                 errCode = "notenoughingredients";
-                errMessage = Lang.Get("Need at least 2 items each");
+                errMessage = Lang.Get(container != null ? "Need at least {0:0.#}L liquid" : "Need at least {0} items each", pieProps.GetPortionSize());
                 return false;
             }
 
@@ -499,7 +579,7 @@ namespace Vintagestory.GameContent
             if (ToppingType != null)
             {
                 bool addingCrust = pieProps.PartType == EnumPiePartType.Crust;
-                EnumTool? tool = stack.Collectible.GetTool(new DummySlot(stack));
+                EnumTool? tool = stack?.Collectible.GetTool(new DummySlot(stack));
                 bool usingCuttingTool = tool == EnumTool.Knife || tool == EnumTool.Sword;
 
                 if (ToppingType == EnumPiePartType.Crust && (addingCrust || usingCuttingTool))
@@ -542,7 +622,16 @@ namespace Vintagestory.GameContent
                 return true;
             }
 
-            InPieProperties?[] stackPieProps = cStacks.Select(InPieProperties.ReadFrom).ToArray();
+            InPieProperties?[] stackPieProps = cStacks.Select(stack =>
+            {
+                InPieProperties? pieProps = InPieProperties.ReadFrom(stack);
+                if (stack != null && pieProps == null)
+                {
+                    // An ingredient already in a pie is missing its inPieProperties
+                    BlockPie.ReportMissingPieProps(Api.Logger, stack.Collectible.Code);
+                }
+                return pieProps;
+            }).ToArray();
 
             bool singleIngredient = true;
             bool allowMixing = pieProps.AllowMixing;
@@ -554,8 +643,12 @@ namespace Vintagestory.GameContent
                 if (cStacks[i] == null) break;
 
                 singleIngredient &= cStacks[i]!.Equals(Api.World, stack, GlobalConstants.IgnoredStackAttributes);
-                allowMixing &= stackPieProps[i]!.AllowMixing == true || pieProps.PartType == EnumPiePartType.Topping;
-                mixCodes = stackPieProps[i]!.MixingCodes.Intersect(mixCodes) ?? [];
+
+                if (stackPieProps[i] != null)
+                {
+                    allowMixing &= stackPieProps[i]!.AllowMixing == true || pieProps.PartType == EnumPiePartType.Topping;
+                    mixCodes = stackPieProps[i]!.MixingCodes.Intersect(mixCodes) ?? [];
+                }
 
                 if (!singleIngredient && !mixCodes.Any()) break;
             }
@@ -593,7 +686,7 @@ namespace Vintagestory.GameContent
         {
             ICoreClientAPI? capi = byPlayer != null ? Api as ICoreClientAPI : null;
 
-            if (PieBlock == null) return false;
+            if (PieBlock == null || slot.Itemstack == null) return false;
 
             if (!CanAddIngredient(slot.Itemstack, out int? emptySlotIndex, out string? errCode, out string? errMessage))
             {
@@ -601,7 +694,16 @@ namespace Vintagestory.GameContent
                 return false;
             }
 
-            if (InPieProperties.ReadFrom(slot.Itemstack)!.PartType == EnumPiePartType.Crust)
+            ILiquidSource? container = slot.Itemstack.Collectible.GetCollectibleInterface<ILiquidSource>();
+            ItemStack contentStack = slot.Itemstack;
+            if (container != null && container.GetContent(slot.Itemstack) is ItemStack cStack)
+            {
+                contentStack = cStack;
+            }
+
+            // CanAddIngredient already made sure the pie props are valid
+            InPieProperties pieProps = InPieProperties.ReadFrom(contentStack)!;
+            if (pieProps.PartType == EnumPiePartType.Crust)
             {
                 if (emptySlotIndex == null)
                 {
@@ -621,12 +723,30 @@ namespace Vintagestory.GameContent
 
             if (byPlayer?.WorldData.CurrentGameMode == EnumGameMode.Creative)
             {
-                ingStack = slot.Itemstack!.Clone();
-                ingStack.StackSize = 2;
+                DummySlot dummySlot = new(slot.Itemstack.Clone());
+                ILiquidSource? dummySource = dummySlot.Itemstack!.Collectible.GetCollectibleInterface<ILiquidSource>();
+
+                if (dummySource != null && contentStack != null && dummySource.TryTakeContent(dummySlot.Itemstack, pieProps.ItemsPerPortion()).StackSize >= pieProps.ItemsPerPortion())
+                {
+                    ingStack = contentStack.Clone();
+                    ingStack.StackSize = pieProps.ItemsPerPortion();
+                }
+                else
+                {
+                    ingStack = dummySlot.TakeOut(pieProps.ItemsPerPortion());
+                }
             }
             else
             {
-                ingStack = slot.TakeOut(2);
+                if (container != null && contentStack != null && container.TryTakeContent(slot.Itemstack, pieProps.ItemsPerPortion()).StackSize >= pieProps.ItemsPerPortion())
+                {
+                    ingStack = contentStack.Clone();
+                    ingStack.StackSize = pieProps.ItemsPerPortion();
+                }
+                else
+                {
+                    ingStack = slot.TakeOut(pieProps.ItemsPerPortion());
+                }
             }
 
             ItemStack[] cStacks = PieBlock.GetContents(Api.World, inv[0].Itemstack);

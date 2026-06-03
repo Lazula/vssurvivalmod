@@ -7,7 +7,6 @@ using Vintagestory.API;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
-using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 
@@ -34,7 +33,7 @@ namespace Vintagestory.GameContent
     ///
     /// [0]: Base dough
     /// [1-4]: Filling
-    /// [5]: Crust dough
+    /// [5]: Crust dough or topping
     /// </summary>
     public class BlockPie : BlockMeal, IBakeableCallback, IShelvable
     {
@@ -110,24 +109,24 @@ namespace Vintagestory.GameContent
                 {
                     foreach (CollectibleObject obj in api.World.Collectibles)
                     {
-                        if (InPieProperties.ReadFrom(obj) is not InPieProperties pieProps || pieProps.FoodCategory == EnumFoodCategory.NoNutrition) continue;
+                        if (InPieProperties.ReadFrom(obj) is not InPieProperties pieProps || !pieProps.CanBeUsed) continue;
                         EnumPiePartType partType = pieProps.PartType;
 
                         if (obj is ItemDough || partType == EnumPiePartType.Crust)
                         {
-                            doughStacks.Add(new ItemStack(obj, 2));
+                            doughStacks.Add(new ItemStack(obj, pieProps.ItemsPerPortion()));
                         }
 
                         switch (partType)
                         {
                             case EnumPiePartType.Filling:
-                                fillStacks.Add(new ItemStack(obj, 2));
+                                fillStacks.Add(new ItemStack(obj, pieProps.ItemsPerPortion()));
                                 break;
                             case EnumPiePartType.Topping:
-                                toppingStacks.Add(new ItemStack(obj, 2));
+                                toppingStacks.Add(new ItemStack(obj, pieProps.ItemsPerPortion()));
                                 break;
                             case EnumPiePartType.Crust:
-                                toppingStacks.Add(new ItemStack(obj, 2));
+                                toppingStacks.Add(new ItemStack(obj, pieProps.ItemsPerPortion()));
                                 break;
                         }
 
@@ -359,9 +358,16 @@ namespace Vintagestory.GameContent
 
             string state = Variant["state"];
 
+            string mixCode = mixCodes.FirstOrDefault() ?? "missing";
+
+            if (mixCode == "missing")
+            {
+                api.Logger.Error($"Pie does not have any valid mixing codes! They were liked removed from one of these ingredients: [\n{string.Join("\n    ", (object?[])cStacks)}\n]");
+            }
+
             string pieName = Lang.Get(singleIngredient
                 ? "pie-single-" + cStacks[1]!.Collectible.Code.ToShortString() + "-" + state
-                : "pie-mixed-" + mixCodes.First() + "-" + state);
+                : "pie-mixed-" + mixCode + "-" + state);
 
             if (cStacks[5] != null && InPieProperties.ReadFrom(cStacks[5])?.PartType != EnumPiePartType.Crust)
             {
@@ -369,7 +375,7 @@ namespace Vintagestory.GameContent
             }
             else
             {
-                return Lang.Get("pie-mixed-" + mixCodes.First() + "-" + state);
+                return Lang.Get("pie-mixed-" + mixCode + "-" + state);
             }
         }
 
@@ -591,7 +597,9 @@ namespace Vintagestory.GameContent
 
             foreach (ItemStack stack in allStacks)
             {
-                if (InPieProperties.ReadFrom(stack) is not InPieProperties pieProps) continue;
+                if (InPieProperties.ReadFrom(stack) is not InPieProperties pieProps || !pieProps.CanBeUsed) continue;
+
+                stack.StackSize = pieProps.ItemsPerPortion();
 
                 switch (pieProps.PartType)
                 {
@@ -631,7 +639,7 @@ namespace Vintagestory.GameContent
                             .Where(topping => topping.Key == entry.Key)
                             .SelectMany(topping => topping.Value)
                             .ToList();
-                        
+
                         // Crusts apply to all mixing codes, so always add them
                         toppings.AddRange(crusts);
 
@@ -666,6 +674,15 @@ namespace Vintagestory.GameContent
 
         private static CookingRecipe CreateRecipe(IWorldAccessor world, string code, List<ItemStack> crusts, List<ItemStack> fillings, List<ItemStack> toppings, bool mixedRecipe = false)
         {
+            static CookingRecipeStack getCookingStack(ItemStack stack) => new()
+            {
+                Code = stack.Collectible.Code,
+                Type = stack.Collectible.ItemClass,
+                StackSize = stack.StackSize,
+                ResolvedItemStack = stack.Clone()
+            };
+
+
             return new()
             {
                 Code = code,
@@ -677,13 +694,8 @@ namespace Vintagestory.GameContent
                         TypeName = "bottomcrust",
                         MinQuantity = 1,
                         MaxQuantity = 1,
-                        ValidStacks = [.. crusts.Select<ItemStack, CookingRecipeStack>(crust => new ()
-                        {
-                            Code = crust.Collectible.Code,
-                            Type = crust.Collectible.ItemClass,
-                            Quantity = 2,
-                            ResolvedItemstack = crust.Clone()
-                        })]
+                        PortionSizeLitres = 0.01f,
+                        ValidStacks = [.. crusts.Select(getCookingStack)]
                     },
                     new ()
                     {
@@ -691,13 +703,8 @@ namespace Vintagestory.GameContent
                         TypeName = "piefilling",
                         MinQuantity = 4,
                         MaxQuantity = 4,
-                        ValidStacks = [.. fillings.Select<ItemStack, CookingRecipeStack>(filling => new ()
-                        {
-                            Code = filling.Collectible.Code,
-                            Type = filling.Collectible.ItemClass,
-                            Quantity = 2,
-                            ResolvedItemstack = filling.Clone()
-                        })]
+                        PortionSizeLitres = 0.01f,
+                        ValidStacks = [.. fillings.Select(getCookingStack)]
                     },
                     new ()
                     {
@@ -705,19 +712,15 @@ namespace Vintagestory.GameContent
                         TypeName = "topcrust",
                         MinQuantity = 0,
                         MaxQuantity = 1,
-                        ValidStacks = [.. toppings.Select<ItemStack, CookingRecipeStack>(topping => new ()
-                        {
-                            Code = topping.Collectible.Code,
-                            Type = topping.Collectible.ItemClass,
-                            Quantity = 2,
-                            ResolvedItemstack = topping.Clone()
-                        })]
+                        PortionSizeLitres = 0.01f,
+                        ValidStacks = [.. toppings.Select(getCookingStack)]
                     }
                 ],
                 PerishableProps = new()
             };
         }
 
+        // NOTE: This method can return an array of 6 nulls if there is a coding error, so check it before using SetContents to avoid accidentally removing contents entirely.
         public static ItemStack?[] GenerateRandomPie(ICoreAPI api, ref Dictionary<CookingRecipeIngredient, HashSet<ItemStack?>>? cachedValidStacksByIngredient, CookingRecipe recipe, ItemStack? ingredientStack = null)
         {
             if (recipe.Ingredients == null) return new ItemStack?[6];
@@ -733,13 +736,13 @@ namespace Vintagestory.GameContent
                     HashSet<ItemStack?> ingredientStacks = [];
 
                     ingredient.Resolve(api.World, "handbook meal recipes");
-                    foreach (ItemStack? astack in ingredient.ValidStacks.Select(stack => stack.ResolvedItemstack))
+                    foreach (ItemStack? stack in ingredient.ValidStacks.Select(stack => stack.ResolvedItemstack))
                     {
-                        if (ingredient.GetMatchingStack(astack) is not CookingRecipeStack vstack) continue;
+                        if (ingredient.GetMatchingStack(stack) is not CookingRecipeStack recipeStack) continue;
 
-                        if (astack?.Clone() is ItemStack stack && BlockLiquidContainerBase.GetContainableProps(stack) is WaterTightContainableProps props)
+                        if (stack != null && BlockLiquidContainerBase.GetContainableProps(stack) is WaterTightContainableProps props)
                         {
-                            stack.StackSize = vstack.StackSize * (int)(props.ItemsPerLitre * ingredient.PortionSizeLitres);
+                            stack.StackSize = recipeStack.StackSize * (int)(props.ItemsPerLitre * ingredient.PortionSizeLitres);
                             ingredientStacks.Add(stack);
                         }
                         else
@@ -783,7 +786,7 @@ namespace Vintagestory.GameContent
                 // list copying for crusts and toppings.
                 if (code != "filling")
                 {
-                    pie.Add(validStacks[api.World.Rand.Next(validStacks.Count)]?.Clone());
+                    pie.Add(validStacks.ElementAtOrDefault(api.World.Rand.Next(validStacks.Count))?.Clone());
                     return;
                 }
 
@@ -825,9 +828,9 @@ namespace Vintagestory.GameContent
             addIngredient(ref randomPie, "filling", ref valIngStacks, ref requestedIngredient);
             addIngredient(ref randomPie, "crust", ref valIngStacks, ref requestedIngredient);
 
-            if (randomPie.Count > 6)
+            if (randomPie.Count != 6)
             {
-                api.Logger.Error($"Random pie [ {string.Join(", ", randomPie)} ] has a length greater than 6. Making it completely empty to prevent worse issues. This is a coding error, so please report it.");
+                api.Logger.Error($"Random pie [ {string.Join(", ", randomPie)} ] has a length that is not 6. Making it completely empty to prevent worse issues. This is a coding error, so please report it.");
                 return [null, null, null, null, null, null];
             }
 
@@ -836,8 +839,7 @@ namespace Vintagestory.GameContent
             if (!recipe.Matches([.. randomPie]))
             {
                 api.Logger.Error($"Random pie [ {string.Join(", ", randomPie)} ] is invalid or does not match recipe {recipe.Code}. Making it completely empty to prevent worse issues. This is a coding error, so please report it.");
-                randomPie = [];
-                while (randomPie.Count < 6) randomPie.Add(null);
+                return [null, null, null, null, null, null];
             }
 
             return [.. randomPie];
@@ -888,8 +890,8 @@ namespace Vintagestory.GameContent
             if (cStacks.Length <= 1 || cStacks[1] == null) return "craftinginfo-pie";
 
             // Use null-forgiving in this method in case the pie is malformed,
-            // e.g. an ingredient lost its pie props. Also report it because
-            // its a content error.
+            // e.g. an ingredient lost its pie props. Report it because its
+            // a content error.
             for (int i = 0; i < 6; i++)
             {
                 if (cStacks[i] != null && InPieProperties.ReadFrom(cStacks[i]) == null)

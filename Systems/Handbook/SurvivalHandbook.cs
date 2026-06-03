@@ -180,7 +180,9 @@ namespace Vintagestory.GameContent
 
                         if (BlockLiquidContainerBase.GetContainableProps(stack) is WaterTightContainableProps props)
                         {
-                            stack.StackSize *= (int)(props.ItemsPerLitre * ingredient.PortionSizeLitres);
+                            // Don't use *= in case the multiplier isn't an int because of nonstandard items per litre
+                            // e.g. 30 * 150 * 0.1 = 1.5
+                            stack.StackSize = (int)(stack.StackSize * props.ItemsPerLitre * ingredient.PortionSizeLitres);
                         }
 
                         ingredientStacks.Add(stack);

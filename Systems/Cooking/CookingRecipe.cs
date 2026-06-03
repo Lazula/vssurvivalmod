@@ -742,7 +742,8 @@ namespace Vintagestory.GameContent
 
                         if (BlockLiquidContainerBase.GetContainableProps(inputStack) is WaterTightContainableProps props)
                         {
-                            stackPortion = (int)(inputStack.StackSize / jstack.StackSize / props.ItemsPerLitre / ingred.PortionSizeLitres);
+                            // Casting to float is necessary if the stack size ratio is less than 1
+                            stackPortion = (int)((float)inputStack.StackSize / jstack.StackSize / props.ItemsPerLitre / ingred.PortionSizeLitres);
                         }
 
                         totalOutputQuantity = Math.Min(totalOutputQuantity, stackPortion);
